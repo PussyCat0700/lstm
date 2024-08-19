@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from paths import source_power_file, train_power_file, test_power_file
+from paths import source_power_file, train_power_file, valid_power_file, test_power_file
 
 def interpolate_missing_data(df):
     """
@@ -23,12 +23,18 @@ def interpolate_missing_data(df):
     df.fillna(method='ffill', inplace=True)  # Fill remaining NaNs with forward fill
     return df
 
-def save_data(train_file, test_file):
+def save_data(train_file, test_file, split=0.95):
     """
     Saves training and testing data to CSV files.
     """
-    pd.DataFrame(train_file).to_csv(train_power_file, index=False)
-    pd.DataFrame(test_file).to_csv(test_power_file, index=False)
+    # Calculate the index to split at
+    split_idx = int(len(train_file) * split)
+    valid_df = train_file.iloc[split_idx:]
+    train_df = train_file.iloc[:split_idx]
+    test_df = test_file
+    train_df.to_csv(train_power_file, index=False)
+    valid_df.to_csv(valid_power_file, index=False)
+    test_df.to_csv(test_power_file, index=False)
 
 def load_data(train_filename, test_filename):
     """

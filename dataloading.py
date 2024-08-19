@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 from torch.utils.data import DataLoader
-from paths import source_nwp_dir, train_power_file, test_power_file
+from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file
 
 class PowerPlantDataset(Dataset):
     def __init__(self, split, plant_number):
@@ -16,7 +16,9 @@ class PowerPlantDataset(Dataset):
         """
         if split == "train":
             csv_file = train_power_file
-        else:
+        elif split == "valid":
+            csv_file = valid_power_file
+        elif split == "test":
             csv_file = test_power_file
         self.data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
         self.nwp_dir = source_nwp_dir
@@ -27,11 +29,11 @@ class PowerPlantDataset(Dataset):
             raise ValueError(f"Invalid plant number: {self.plant_number}. Must be between 0 and {self.data.shape[1] - 1}.")
 
     def __len__(self):
-        return len(self.data) - 48  # Each sample requires data from two consecutive days
+        return len(self.data) - 96*2  # Each sample requires data from two consecutive days. 96 points for each day
 
     def __getitem__(self, idx):
         # Current day data
-        start_time = self.data.index[idx].replace(hour=0, minute=0, second=0, microsecond=0)
+        start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
         end_time = start_time + pd.DateOffset(hours=23, minutes=45)
         X = self.data.loc[start_time:end_time].iloc[:, self.plant_number].values
         
@@ -51,17 +53,13 @@ class PowerPlantDataset(Dataset):
 # X, Y, nwp_data = dataset[0]
 
 
-def get_data_loaders(plant_number, batch_size, train_ratio=0.95):
+def get_data_loaders(plant_number, batch_size):
     train_dataset = PowerPlantDataset("train", plant_number)
+    valid_dataset = PowerPlantDataset("valid", plant_number)
     test_dataset = PowerPlantDataset("test", plant_number)
-    # Sequential splitting
-    train_size = int(train_ratio * len(train_dataset))
-    val_size = len(train_dataset) - train_size
-    val_dataset = torch.utils.data.Subset(train_dataset, list(range(train_size, train_size + val_size)))
-    train_dataset = torch.utils.data.Subset(train_dataset, list(range(0, train_size)))
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
