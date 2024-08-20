@@ -4,7 +4,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dataloading import get_data_loaders, save_checkpoint
+from dataloading import get_data_loaders, get_latest_checkpoint, load_checkpoint, save_checkpoint
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
@@ -25,11 +25,18 @@ def train_model(device, model, train_loader, val_loader, test_loader, num_epochs
 
     # Create checkpoint directory if not exists
     os.makedirs(checkpoint_dir, exist_ok=True)
-
+    start_epoch = 0
     best_val_loss = float('inf')
 
+    latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
+    if latest_checkpoint:
+        print(f"Resuming from checkpoint: {latest_checkpoint}")
+        start_epoch, best_val_loss = load_checkpoint(latest_checkpoint, model, optimizer)
+    else:
+        print("No checkpoint found, starting from scratch.")
+
     # Training loop
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         model.train()
         train_loss = 0.0
         pbar = tqdm(train_loader)

@@ -67,3 +67,21 @@ def get_data_loaders(plant_number, batch_size):
 
 def save_checkpoint(state, filename):
     torch.save(state, filename)
+
+
+def get_latest_checkpoint(checkpoint_dir):
+    checkpoints = [f for f in os.listdir(checkpoint_dir) if f.endswith(".pt")]
+    if not checkpoints:
+        return None
+    checkpoints.sort(key=lambda f: int(f.split('_')[-1].split('.')[0]), reverse=True)
+    return os.path.join(checkpoint_dir, checkpoints[0])
+
+
+def load_checkpoint(checkpoint_path, model, optimizer=None):
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    if optimizer:
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    start_epoch = checkpoint['epoch']
+    loss = checkpoint.get('loss', None)
+    return start_epoch, loss
