@@ -7,12 +7,14 @@ from torch.utils.data import DataLoader
 from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file
 
 class PowerPlantDataset(Dataset):
-    def __init__(self, split, plant_number):
+    def __init__(self, split, plant_number, power_minmax=None):
         """
         Args:
             csv_file (string): Path to the CSV file with power generation data.
             nwp_dir (string): Directory with NWP future 49-hour forecast .npy files.
             plant_number (int): Index of the power plant to be used for the dataset.
+            power_minmax ([float, float]) Power min and power max for the given station only.
+            If None, will be determined with current file.
         """
         if split == "train":
             csv_file = train_power_file
@@ -23,10 +25,24 @@ class PowerPlantDataset(Dataset):
         self.data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
         self.nwp_dir = source_nwp_dir
         self.plant_number = plant_number
+        if power_minmax is None:
+            self.power_minmax = [
+                max(0.0, self.data.min()[self.plant_number]),
+                self.data.max()[self.plant_number]]
+        else:
+            self.power_minmax = power_minmax
+        self.power_min = self.power_minmax[0]
+        self.power_max = self.power_minmax[1]
 
         # Ensure the plant number is valid
         if self.plant_number < 0 or self.plant_number >= self.data.shape[1]:
             raise ValueError(f"Invalid plant number: {self.plant_number}. Must be between 0 and {self.data.shape[1] - 1}.")
+
+    def normalize_power_data(self, data):
+        return (data - self.power_min) / (self.power_max - self.power_min)
+    
+    def denormalize_power_data(self, data):
+        return data * (self.power_max - self.power_min) + self.power_min
 
     def __len__(self):
         return len(self.data) - 96*2  # Each sample requires data from two consecutive days. 96 points for each day
@@ -36,27 +52,26 @@ class PowerPlantDataset(Dataset):
         start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
         end_time = start_time + pd.DateOffset(hours=23, minutes=45)
         X = self.data.loc[start_time:end_time].iloc[:, self.plant_number].values
+        X_norm = self.normalize_power_data(X)
         
         # Next day data
         next_start_time = start_time + pd.DateOffset(days=1)
         next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, self.plant_number].values
+        Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
         nwp_file = os.path.join(self.nwp_dir, f"{start_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
         nwp_data = np.load(nwp_file)
 
-        return torch.tensor(X, dtype=torch.float32), torch.tensor(Y, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
-
-# Example usage
-# dataset = PowerPlantDataset(csv_file='/home/yfliu/horizontal/windmodel_baselines/lstm/inputs/test_nmg_wf_history.csv', nwp_dir='/data1/yfliu/windpower_baseline/weather_history', plant_number=0)
-# X, Y, nwp_data = dataset[0]
+        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
 
 
 def get_data_loaders(plant_number, batch_size):
     train_dataset = PowerPlantDataset("train", plant_number)
-    valid_dataset = PowerPlantDataset("valid", plant_number)
-    test_dataset = PowerPlantDataset("test", plant_number)
+    power_minmax = train_dataset.power_minmax
+    valid_dataset = PowerPlantDataset("valid", plant_number, power_minmax)
+    test_dataset = PowerPlantDataset("test", plant_number, power_minmax)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)

@@ -12,52 +12,60 @@ num_layers = 2
 
 class BiLSTMWithFusion(nn.Module):
     def __init__(self,
-                 nwp_input_size=nwp_input_size,
-                 power_input_size=power_input_size,
-                 hidden_size=hidden_size,
-                 output_size=output_size,
-                 num_layers=2):
+                 input_dim=nwp_input_size+power_input_size,
+                 hidden_dim=hidden_size,
+                 num_layers=2,
+                 output_dim=1,
+                 dropout=0.3):
         super(BiLSTMWithFusion, self).__init__()
-        self.hidden_size = hidden_size
+        self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        
-        # Bi-LSTM for NWP data
-        self.nwp_lstm = nn.LSTM(nwp_input_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True)
-        
-        # Bi-LSTM for Power data
-        self.power_lstm = nn.LSTM(power_input_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True)
-        
-        # Fully connected layer for fusion and final output
-        self.fc = nn.Linear(hidden_size * 4, output_size)  # Multiply by 4 for bidirectional + fusion of two LSTMs
 
+        # NWP MLP mapping lengths
+        self.nwp_mlp = nn.Linear(48, 96)
+
+        # BiLSTM layer
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, 
+                            batch_first=True, dropout=dropout, bidirectional=True)
+        
+        # Batch Norm Layer
+        self.batch_norm = nn.BatchNorm1d(hidden_dim * 2)
+        
+        # Fully connected layer
+        self.fc = nn.Linear(hidden_dim * 2, output_dim)
+        
+        # Activation function
+        self.activation = nn.ReLU()
+        
+        # Dropout layer
+        self.dropout = nn.Dropout(dropout)
+    
     def forward(self, nwp_data, power_data):
-        # Initialize hidden state and cell state for NWP LSTM
-        h0_nwp = torch.zeros(self.num_layers * 2, nwp_data.size(0), self.hidden_size).to(nwp_data.device)  # 2 for bidirectional
-        c0_nwp = torch.zeros(self.num_layers * 2, nwp_data.size(0), self.hidden_size).to(nwp_data.device)
+        # Concatenate the power and NWP data along the feature dimension
+        nwp_data = self.nwp_mlp(nwp_data.transpose(-1, -2)).transpose(-1, -2)
+        combined_input = torch.cat((power_data, nwp_data), dim=2)
         
-        # Initialize hidden state and cell state for Power LSTM
-        h0_power = torch.zeros(self.num_layers * 2, power_data.size(0), self.hidden_size).to(power_data.device)  # 2 for bidirectional
-        c0_power = torch.zeros(self.num_layers * 2, power_data.size(0), self.hidden_size).to(power_data.device)
+        # LSTM layer
+        lstm_out, _ = self.lstm(combined_input)
         
-        # LSTM output for NWP data
-        nwp_out, _ = self.nwp_lstm(nwp_data, (h0_nwp, c0_nwp))
+        # Apply batch normalization across the time dimension
+        lstm_out = lstm_out.permute(0, 2, 1)  # Switch batch and feature dimensions
+        lstm_out = self.batch_norm(lstm_out)
+        lstm_out = lstm_out.permute(0, 2, 1)  # Switch them back
         
-        # LSTM output for Power data
-        power_out, _ = self.power_lstm(power_data, (h0_power, c0_power))
+        # Apply the fully connected layer to each timestep
+        output = self.fc(lstm_out)
         
-        # Concatenate the last time steps from both LSTM outputs
-        combined = torch.cat((nwp_out[:, -1, :], power_out[:, -1, :]), dim=1)
+        # Apply activation function
+        output = self.activation(output)
         
-        # Pass through fully connected layer to generate final output
-        out = self.fc(combined)
-        
-        return out
+        return output
 
 # Initialize model, loss function, and optimizer
-model = BiLSTMWithFusion(nwp_input_size=nwp_input_size, power_input_size=power_input_size,
-                         hidden_size=hidden_size, output_size=output_size, num_layers=num_layers)
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+# model = BiLSTMWithFusion(nwp_input_size=nwp_input_size, power_input_size=power_input_size,
+#                          hidden_size=hidden_size, output_size=output_size, num_layers=num_layers)
+# criterion = nn.MSELoss()
+# optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # for epoch in range(num_epochs):
 #     for X, Y, nwp_data in train_loader:

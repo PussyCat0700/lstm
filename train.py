@@ -128,7 +128,7 @@ def main(args):
     train_loader, val_loader, test_loader = get_data_loaders(args.plant_number, args.batch_size)
 
     # Initialize model, criterion, and optimizer
-    model = BiLSTMWithFusion(nwp_input_size=16, power_input_size=1, hidden_size=args.hidden_size, output_size=96, num_layers=args.num_layers).to(device)
+    model = BiLSTMWithFusion().to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
