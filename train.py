@@ -69,7 +69,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
                 power_data = X.view(X.size(0), X.size(1), 1)
                 outputs = model(nwp_data, power_data)
-                loss = criterion(outputs, Y)
+                loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
                 val_loss += loss.item()
                 
                 if use_wandb:
@@ -101,7 +101,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
             power_data = X.view(X.size(0), X.size(1), 1)
             outputs = model(nwp_data, power_data)
-            loss = criterion(outputs, Y)
+            loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
             test_loss += loss.item()
             
             if use_wandb:
