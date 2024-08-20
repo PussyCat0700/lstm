@@ -67,7 +67,7 @@ class PowerPlantDataset(Dataset):
         return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
 
 
-def get_data_loaders(plant_number, batch_size):
+def get_data_loaders_and_denormalizer(plant_number, batch_size):
     train_dataset = PowerPlantDataset("train", plant_number)
     power_minmax = train_dataset.power_minmax
     valid_dataset = PowerPlantDataset("valid", plant_number, power_minmax)
@@ -77,7 +77,7 @@ def get_data_loaders(plant_number, batch_size):
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, train_dataset.denormalize_power_data
 
 
 def save_checkpoint(state, filename):

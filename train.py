@@ -4,13 +4,13 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dataloading import get_data_loaders, get_latest_checkpoint, load_checkpoint, save_checkpoint
+from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint, load_checkpoint, save_checkpoint
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, num_epochs, criterion, optimizer, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints"):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, criterion, optimizer, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints"):
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(project="power-forecasting-lstm", config={
@@ -47,7 +47,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, num_epochs
             
             optimizer.zero_grad()
             outputs = model(nwp_data, power_data)
-            loss = criterion(outputs, Y)
+            loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
             loss.backward()
             optimizer.step()
             
@@ -125,7 +125,7 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Get data loaders
-    train_loader, val_loader, test_loader = get_data_loaders(args.plant_number, args.batch_size)
+    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
 
     # Initialize model, criterion, and optimizer
     model = BiLSTMWithFusion().to(device)
@@ -133,7 +133,7 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # Train the model
-    train_model(0, model, train_loader, val_loader, test_loader, args.num_epochs, criterion, optimizer, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
+    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, criterion, optimizer, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
