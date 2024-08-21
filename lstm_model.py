@@ -42,7 +42,8 @@ class BiLSTMWithFusion(nn.Module):
     
     def forward(self, nwp_data, power_data):
         # Concatenate the power and NWP data along the feature dimension
-        nwp_data = self.nwp_mlp(nwp_data.transpose(-1, -2)).transpose(-1, -2)
+        nwp_norm = (nwp_data - nwp_data.min()) / (nwp_data.max() - nwp_data.min())
+        nwp_data = self.nwp_mlp(nwp_norm.transpose(-1, -2)).transpose(-1, -2)
         combined_input = torch.cat((power_data, nwp_data), dim=2)
         
         # LSTM layer
