@@ -8,9 +8,14 @@ from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, criterion, optimizer, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints"):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=50):
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
+    # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(project="power-forecasting-lstm", config={
@@ -26,6 +31,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     # Create checkpoint directory if not exists
     os.makedirs(checkpoint_dir, exist_ok=True)
     start_epoch = 0
+    patience_counter = 0
     best_val_loss = float('inf')
 
     latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
@@ -81,6 +87,9 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         val_loss /= len(val_loader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Validation Loss: {val_loss:.4f}")
         
+        # Adjust the learning rate based on validation loss
+        scheduler.step(val_loss)
+        
         # Save checkpoint if this epoch has the best validation loss
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -90,10 +99,16 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': val_loss,
             }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print("Early stopping triggered")
+                break
         
         if use_wandb:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
     
+    best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
     # Testing loop
     model.eval()
     test_loss = 0.0
@@ -115,6 +130,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     
     if use_wandb:
         wandb.log({"final_test_loss": test_loss})
+        wandb.log({"best_epoch": best_epoch})
         wandb.finish()
     else:
         writer.close()
@@ -130,11 +146,9 @@ def main(args):
 
     # Initialize model, criterion, and optimizer
     model = BiLSTMWithFusion().to(device)
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # Train the model
-    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, criterion, optimizer, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
+    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
