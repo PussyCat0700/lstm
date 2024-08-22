@@ -97,6 +97,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         # Save checkpoint if this epoch has the best validation loss
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            patience_counter = 0
             save_checkpoint({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
