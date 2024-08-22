@@ -45,9 +45,15 @@ class BiLSTMWithFusion(nn.Module):
         nwp_norm = (nwp_data - nwp_data.min()) / (nwp_data.max() - nwp_data.min())
         nwp_data = self.nwp_mlp(nwp_norm.transpose(-1, -2)).transpose(-1, -2)
         combined_input = torch.cat((power_data, nwp_data), dim=2)
-        
+        # Repeat the first and last token
+        first_token = combined_input[:, 0:1, :]  # Shape: (batch_size, 1, features)
+        last_token = combined_input[:, -1:, :]   # Shape: (batch_size, 1, features)
+        combined_input = torch.cat([first_token, combined_input, last_token], dim=1)
         # LSTM layer
         lstm_out, _ = self.lstm(combined_input)
+
+        # Remove the repeated tokens after LSTM processing
+        lstm_out = lstm_out[:, 1:-1, :]
         
         # Apply batch normalization across the time dimension
         lstm_out = lstm_out.permute(0, 2, 1)  # Switch batch and feature dimensions
