@@ -18,12 +18,16 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
-        wandb.init(project="power-forecasting-lstm", config={
-            "epochs": num_epochs,
-            "batch_size": train_loader.batch_size,
-            "learning_rate": optimizer.param_groups[0]['lr'],
-            "architecture": "BiLSTMWithFusion"
-        })
+        wandb.init(
+            project="power-forecasting-lstm",
+            config={
+                "epochs": num_epochs,
+                "batch_size": train_loader.batch_size,
+                "learning_rate": optimizer.param_groups[0]['lr'],
+                "architecture": "BiLSTMWithFusion"
+            },
+            name=os.path.basename(checkpoint_dir),    
+        )
         wandb.watch(model, log="all")
     else:
         writer = SummaryWriter(log_dir=log_dir)
