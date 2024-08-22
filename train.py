@@ -47,7 +47,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             
             optimizer.zero_grad()
             outputs = model(nwp_data, power_data)
-            loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
+            # see if view helps (https://datascience.stackexchange.com/questions/87630/pytorch-lstm-for-time-series-failing-to-learn)
+            loss = criterion(denormalizer(outputs.view([outputs.size(0), outputs.size(1)])), denormalizer(Y))
             loss.backward()
             optimizer.step()
             
