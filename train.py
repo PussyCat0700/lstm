@@ -139,7 +139,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the optimizer")
     parser.add_argument("--hidden_size", type=int, default=100, help="Hidden size of the LSTM layers")
     parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
