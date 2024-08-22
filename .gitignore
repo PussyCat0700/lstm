@@ -6,3 +6,6 @@ runs/**
 logs/**
 checkpoints/**
 wandb/**
+*.pt
+*.err
+*.out

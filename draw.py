@@ -1,0 +1,69 @@
+import argparse
+import os
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint, load_checkpoint
+from lstm_model import BiLSTMWithFusion
+
+import torch
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, days=10, device='cuda'):
+    model.eval()  # Set model to evaluation mode
+    all_preds = []
+    all_gts = []
+    
+    with torch.no_grad():
+        for X, Y, nwp_data in test_loader:
+            X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+            power_data = X.view(X.size(0), X.size(1), 1)
+            
+            # Generate predictions
+            preds = model(nwp_data, power_data).squeeze(-1)
+            
+            # If outputs are normalized, denormalize them (assuming `scaler` was used to normalize)
+            preds = denormalizer(preds).cpu().numpy()
+            gt = denormalizer(Y).cpu().numpy()
+            all_preds.extend(preds)
+            all_gts.extend(gt)
+    
+    # Convert lists to numpy arrays
+    all_preds = np.array(all_preds)
+    all_gts = np.array(all_gts)
+    all_preds = all_preds.reshape(-1, 96, 96)[:, 0, :].flatten()
+    all_gts = all_gts.reshape(-1, 96, 96)[:, 0, :].flatten()
+    # Plot the results
+    plt.figure()
+    plt.plot(all_gts[:96*days], label='Ground Truth', color='blue')
+    plt.plot(all_preds[:96*days], label='Prediction', color='red')
+    plt.xlabel('Time Step')
+    plt.ylabel('Power (MW)')
+    plt.title('Predicted vs Ground Truth Power Output')
+    plt.legend()
+    plt.savefig(filename)
+
+# Example usage
+# plot_predictions_vs_ground_truth(model, test_loader, scaler, device='cuda')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
+    parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")
+    
+    args = parser.parse_args()
+    # Set up device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Get data loaders
+    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
+
+    # Initialize model, criterion, and optimizer
+    model = BiLSTMWithFusion().to(device)
+    latest_checkpoint = get_latest_checkpoint(args.checkpoint_dir)
+    print(f'loading from {latest_checkpoint}')
+    _, _ = load_checkpoint(latest_checkpoint, model, None)
+    filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
+    plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
