@@ -47,9 +47,13 @@ class PowerPlantDataset(Dataset):
     def __len__(self):
         return len(self.data) - 96*2  # Each sample requires data from two consecutive days. 96 points for each day
 
+    def _get_start_time(self, idx):
+        start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
+        return start_time
+
     def __getitem__(self, idx):
         # Current day data
-        start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
+        start_time = self._get_start_time(idx)
         end_time = start_time + pd.DateOffset(hours=23, minutes=45)
         X = self.data.loc[start_time:end_time].iloc[:, self.plant_number].values
         X_norm = self.normalize_power_data(X)
@@ -67,11 +71,20 @@ class PowerPlantDataset(Dataset):
         return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
 
 
+class PowerPlantDailyDataset(PowerPlantDataset):
+    def __len__(self):
+        return len(self.data) // 96 - 2
+
+    def _get_start_time(self, idx):
+        start_time = self.data.index[idx*96].replace(minute=0, second=0, microsecond=0)
+        return start_time
+
+
 def get_data_loaders_and_denormalizer(plant_number, batch_size):
-    train_dataset = PowerPlantDataset("train", plant_number)
+    train_dataset = PowerPlantDailyDataset("train", plant_number)
     power_minmax = train_dataset.power_minmax
-    valid_dataset = PowerPlantDataset("valid", plant_number, power_minmax)
-    test_dataset = PowerPlantDataset("test", plant_number, power_minmax)
+    valid_dataset = PowerPlantDailyDataset("valid", plant_number, power_minmax)
+    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
