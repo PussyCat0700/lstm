@@ -81,7 +81,8 @@ class BiLSTMNWPOnly(nn.Module):
         self.num_layers = num_layers
         
         # NWP MLP mapping lengths
-        self.nwp_mlp = nn.Linear(48, 96)
+        self.division_start = 63
+        self.nwp_mlp = nn.Linear(48, 192)
 
         # BiLSTM layer
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, 
@@ -116,5 +117,8 @@ class BiLSTMNWPOnly(nn.Module):
         
         # Apply activation function
         output = self.activation(output)
-        
+        if self.training:
+            output = output[..., :self.division_start+96]
+        else:
+            output = output[..., self.division_start:self.division_start+96]
         return output

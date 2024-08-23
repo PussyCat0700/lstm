@@ -84,6 +84,10 @@ class PowerPlantDailyDataset(PowerPlantDataset):
     2. nwp的时差
     08:00:00->00:00:00 -8h
     """
+    def __init__(self, split, plant_number, power_minmax=None):
+        super().__init__(split, plant_number, power_minmax)
+        self.training = split == "train"
+    
     def __len__(self):
         return len(self.data) // 96 -  2
 
@@ -99,8 +103,14 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         X_norm = self.normalize_power_data(X)
         
         # Next day data
-        next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
-        next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
+        if self.training:
+            # total span: 63+96=159
+            next_start_time = start_time + pd.DateOffset(days=1)  # day1 start 08:15:00
+            next_end_time = next_start_time + pd.DateOffset(hours=15, minutes=45) + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
+        else:
+            # total span: 96
+            next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
+            next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, self.plant_number].values
         Y_norm = self.normalize_power_data(Y)
 
