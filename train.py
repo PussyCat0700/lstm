@@ -15,7 +15,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(
