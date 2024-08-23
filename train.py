@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils import get_parameter_number
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=100):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=2000):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
@@ -104,13 +104,14 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
+            print(f'{best_val_loss=}')
             save_checkpoint({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': val_loss,
             }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
-        elif epoch > 0.2*patience:
+        else:
             # otherwise you might get very high training loss. Our val set is too small.
             patience_counter += 1
             if patience_counter >= patience:
@@ -120,9 +121,13 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         if use_wandb:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
     
-    latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
-    best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
-    print(f'testing on epoch {best_epoch}')
+    save_checkpoint({
+        'epoch': epoch + 1,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': val_loss,
+    }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+    print(f'testing on epoch {epoch}')
     # Testing loop
     model.eval()
     test_loss = 0.0
@@ -147,7 +152,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     if use_wandb:
         wandb.log({"test_mae": mae, "test_mse":mse})
         wandb.log({"final_test_loss": test_loss})
-        wandb.log({"best_epoch": best_epoch})
+        wandb.log({"best_epoch": epoch})
         wandb.finish()
     else:
         writer.close()
@@ -170,7 +175,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--hidden_size", type=int, default=100, help="Hidden size of the LSTM layers")
     parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
