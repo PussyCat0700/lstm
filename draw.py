@@ -32,6 +32,10 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     # Convert lists to numpy arrays
     all_preds = np.array(all_preds).flatten()
     all_gts = np.array(all_gts).flatten()
+    mae = np.mean(np.abs(all_preds - all_gts))
+    mse = np.mean(np.abs(all_preds - all_gts) ** 2)
+    print(mae)
+    print(mse)
     # Plot the results
     plt.figure()
     plt.plot(all_gts[:96*days], label='Ground Truth', color='blue')
