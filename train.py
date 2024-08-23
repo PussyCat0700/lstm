@@ -1,5 +1,5 @@
 import os
-from lstm_model import BiLSTMWithFusion
+from lstm_model import BiLSTMNWPOnly
 import argparse
 import torch
 import torch.nn as nn
@@ -11,11 +11,11 @@ from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=50):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=100):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(
@@ -53,12 +53,10 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         print(f'*****{epoch=}******')
         for batch_idx, (X, Y, nwp_data) in enumerate(pbar):
             X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-            power_data = X.view(X.size(0), X.size(1), 1)
             
             optimizer.zero_grad()
-            outputs = model(nwp_data, power_data)
-            # see if view helps (https://datascience.stackexchange.com/questions/87630/pytorch-lstm-for-time-series-failing-to-learn)
-            loss = criterion(denormalizer(outputs.view([outputs.size(0), outputs.size(1)])), denormalizer(Y))
+            outputs = model(nwp_data)
+            loss = criterion(denormalizer(outputs), denormalizer(Y))
             loss.backward()
             optimizer.step()
             
@@ -78,9 +76,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         with torch.no_grad():
             for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-                power_data = X.view(X.size(0), X.size(1), 1)
-                outputs = model(nwp_data, power_data)
-                loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
+                outputs = model(nwp_data)
+                loss = criterion(denormalizer(outputs), denormalizer(Y))
                 val_loss += loss.item()
                 
                 if use_wandb:
@@ -113,6 +110,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         if use_wandb:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
     
+    latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
     best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
     print(f'testing on epoch {best_epoch}')
     # Testing loop
@@ -121,9 +119,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     with torch.no_grad():
         for batch_idx, (X, Y, nwp_data) in enumerate(test_loader):
             X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-            power_data = X.view(X.size(0), X.size(1), 1)
-            outputs = model(nwp_data, power_data)
-            loss = criterion(denormalizer(outputs.squeeze(-1)), denormalizer(Y))
+            outputs = model(nwp_data)
+            loss = criterion(denormalizer(outputs), denormalizer(Y))
             test_loss += loss.item()
             
             if use_wandb:
@@ -151,7 +148,7 @@ def main(args):
     train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
 
     # Initialize model, criterion, and optimizer
-    model = BiLSTMWithFusion().to(device)
+    model = BiLSTMNWPOnly().to(device)
 
     # Train the model
     train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
@@ -159,8 +156,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
-    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the optimizer")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--hidden_size", type=int, default=100, help="Hidden size of the LSTM layers")
     parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
     parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")

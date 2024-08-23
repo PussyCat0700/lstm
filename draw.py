@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint, load_checkpoint
-from lstm_model import BiLSTMWithFusion
+from lstm_model import BiLSTMNWPOnly
 
 import torch
 import matplotlib.pyplot as plt
@@ -18,11 +18,8 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     with torch.no_grad():
         for X, Y, nwp_data in test_loader:
             X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-            power_data = X.view(X.size(0), X.size(1), 1)
-            
             # Generate predictions
-            preds = model(nwp_data, power_data).squeeze(-1)
-            
+            preds = model(nwp_data)
             # If outputs are normalized, denormalize them (assuming `scaler` was used to normalize)
             preds = denormalizer(preds).cpu().numpy()
             gt = denormalizer(Y).cpu().numpy()
@@ -63,7 +60,7 @@ if __name__ == '__main__':
     train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
 
     # Initialize model, criterion, and optimizer
-    model = BiLSTMWithFusion().to(device)
+    model = BiLSTMNWPOnly().to(device)
     latest_checkpoint = get_latest_checkpoint(args.checkpoint_dir)
     print(f'loading from {latest_checkpoint}')
     _, _ = load_checkpoint(latest_checkpoint, model, None)

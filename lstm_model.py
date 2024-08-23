@@ -68,21 +68,53 @@ class BiLSTMWithFusion(nn.Module):
         
         return output
 
-# Initialize model, loss function, and optimizer
-# model = BiLSTMWithFusion(nwp_input_size=nwp_input_size, power_input_size=power_input_size,
-#                          hidden_size=hidden_size, output_size=output_size, num_layers=num_layers)
-# criterion = nn.MSELoss()
-# optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# for epoch in range(num_epochs):
-#     for X, Y, nwp_data in train_loader:
-#         # Reshape power data to add feature dimension (96,1) for LSTM input
-#         power_data = X.view(X.size(0), X.size(1), 1)  
-#         output = model(nwp_data, power_data)
-#         loss = criterion(output, Y)
+class BiLSTMNWPOnly(nn.Module):
+    def __init__(self,
+                 input_dim=nwp_input_size,
+                 hidden_dim=hidden_size,
+                 num_layers=2,
+                 output_dim=1,
+                 dropout=0.3):
+        super(BiLSTMNWPOnly, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
         
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
+        # NWP MLP mapping lengths
+        self.nwp_mlp = nn.Linear(48, 96)
+
+        # BiLSTM layer
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, 
+                            batch_first=True, dropout=dropout, bidirectional=True)
         
-#     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        # Batch Norm Layer
+        self.batch_norm = nn.BatchNorm1d(hidden_dim * 2)
+        
+        # Fully connected layer
+        self.fc = nn.Linear(hidden_dim*2, output_dim)
+        
+        # Activation function
+        self.activation = nn.ReLU()
+        
+        # Dropout layer
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, nwp_data):
+        # Concatenate the power and NWP data along the feature dimension
+        nwp_norm = (nwp_data - nwp_data.min()) / (nwp_data.max() - nwp_data.min())
+        nwp_data = self.nwp_mlp(nwp_norm.transpose(-1, -2)).transpose(-1, -2)
+        # LSTM layer
+        lstm_out, _ = self.lstm(nwp_data)  # [B, 48, hs*2]
+        
+        # Apply batch normalization across the time dimension
+        lstm_out = lstm_out.permute(0, 2, 1)  # Switch batch and feature dimensions
+        lstm_out = self.batch_norm(lstm_out)
+        lstm_out = lstm_out.permute(0, 2, 1)  # Switch them back
+        
+        # Apply the fully connected layer to each timestep
+        output = self.fc(lstm_out).squeeze(-1)
+        
+        # Apply activation function
+        output = self.activation(output)
+        
+        return output
