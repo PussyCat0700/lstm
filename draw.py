@@ -31,8 +31,6 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     all_gts = np.array(all_gts).flatten()
     mae = np.mean(np.abs(all_preds - all_gts))
     mse = np.mean(np.abs(all_preds - all_gts) ** 2)
-    print(mae)
-    print(mse)
     # Plot the results
     plt.figure()
     plt.plot(all_gts[:96*days], label='Ground Truth', color='blue')
@@ -42,6 +40,7 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     plt.title('Predicted vs Ground Truth Power Output')
     plt.legend()
     plt.savefig(filename)
+    return mae, mse
 
 # Example usage
 # plot_predictions_vs_ground_truth(model, test_loader, scaler, device='cuda')
@@ -65,4 +64,6 @@ if __name__ == '__main__':
     print(f'loading from {latest_checkpoint}')
     _, _ = load_checkpoint(latest_checkpoint, model, None)
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
+    mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
+    print(mae)
+    print(mse)
