@@ -141,6 +141,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     print(f"Test Loss: {test_loss:.4f}")
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
     mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
+    print(mae)
+    print(mse)
     if use_wandb:
         wandb.log({"test_mae": mae, "test_mse":mse})
         wandb.log({"final_test_loss": test_loss})
