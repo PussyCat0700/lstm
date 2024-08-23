@@ -9,7 +9,6 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=50):
@@ -29,16 +28,6 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             },
             name=os.path.basename(checkpoint_dir),    
         )
-        wandb.init(
-            project="power-forecasting-lstm",
-            config={
-                "epochs": num_epochs,
-                "batch_size": train_loader.batch_size,
-                "learning_rate": optimizer.param_groups[0]['lr'],
-                "architecture": "BiLSTMWithFusion"
-            },
-            name=os.path.basename(checkpoint_dir),    
-        )
         wandb.watch(model, log="all")
     else:
         writer = SummaryWriter(log_dir=log_dir)
@@ -46,7 +35,6 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     # Create checkpoint directory if not exists
     os.makedirs(checkpoint_dir, exist_ok=True)
     start_epoch = 0
-    patience_counter = 0
     patience_counter = 0
     best_val_loss = float('inf')
 
@@ -106,9 +94,6 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         # Adjust the learning rate based on validation loss
         scheduler.step(val_loss)
         
-        # Adjust the learning rate based on validation loss
-        scheduler.step(val_loss)
-        
         # Save checkpoint if this epoch has the best validation loss
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -129,7 +114,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
     
     best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
-    best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
+    print(f'testing on epoch {best_epoch}')
     # Testing loop
     model.eval()
     test_loss = 0.0
@@ -151,7 +136,6 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     
     if use_wandb:
         wandb.log({"final_test_loss": test_loss})
-        wandb.log({"best_epoch": best_epoch})
         wandb.log({"best_epoch": best_epoch})
         wandb.finish()
     else:
