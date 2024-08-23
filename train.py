@@ -110,7 +110,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': val_loss,
             }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
-        else:
+        elif epoch > 0.2*patience:
+            # otherwise you might get very high training loss. Our val set is too small.
             patience_counter += 1
             if patience_counter >= patience:
                 print("Early stopping triggered")
