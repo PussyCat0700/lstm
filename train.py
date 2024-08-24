@@ -13,7 +13,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils import get_parameter_number
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=2000):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=100):
+    skip_model_selection = True
+    # 如果真按1k epochs训练效果会更好，但是8分钟才训完一个站，太慢了。
+    # if skip_model_selection:
+    #     patience = 100000  # magic number: inf
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
@@ -121,13 +125,19 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         if use_wandb:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
     
-    save_checkpoint({
-        'epoch': epoch + 1,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': val_loss,
-    }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
-    print(f'testing on epoch {epoch}')
+    if skip_model_selection:
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': val_loss,
+        }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+        best_epoch = epoch
+    else:
+        latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
+        best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
+
+    print(f'testing on epoch {best_epoch}')
     # Testing loop
     model.eval()
     test_loss = 0.0
@@ -152,7 +162,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     if use_wandb:
         wandb.log({"test_mae": mae, "test_mse":mse})
         wandb.log({"final_test_loss": test_loss})
-        wandb.log({"best_epoch": epoch})
+        wandb.log({"best_epoch": best_epoch})
         wandb.finish()
     else:
         writer.close()
