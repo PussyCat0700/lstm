@@ -1,18 +1,16 @@
 import os
 from draw import plot_predictions_vs_ground_truth
-from lstm_model import BiLSTMNWPOnly
-from ffnn_model import WindPowerFFNN
 import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint, load_checkpoint, save_checkpoint
+from dataloading import get_latest_checkpoint, load_checkpoint, save_checkpoint
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from utils import get_parameter_number
-from constants import LSTM, FFNN, model_type_dict
+from utils import get_model_and_loader, get_parameter_number
+from constants import model_type_dict
 
 
 def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=100):
@@ -175,16 +173,7 @@ def main(args):
     # Set up device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if args.model_type == LSTM:
-        # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
-        # Initialize model, criterion, and optimizer
-        model = BiLSTMNWPOnly().to(device)
-    elif args.model_type == FFNN:
-        # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
-        # Initialize model, criterion, and optimizer
-        model = WindPowerFFNN().to(device)
+    model, train_loader, val_loader, test_loader, denormalizer = get_model_and_loader(args, device)
 
     # Train the model
     train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)

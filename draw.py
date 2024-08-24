@@ -3,9 +3,10 @@ import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from dataloading import get_data_loaders_and_denormalizer, get_latest_checkpoint, load_checkpoint
+from dataloading import get_latest_checkpoint, load_checkpoint
+from utils import get_model_and_loader
 from lstm_model import BiLSTMNWPOnly
-
+from constants import model_type_dict
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,19 +48,20 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
+    parser.add_argument("model_type", type=int, choices=[0, 1])
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")
     
     args = parser.parse_args()
+    args.model_type = model_type_dict[args.model_type]
+    print(f'now drawing for {args.model_type}')
     # Set up device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Get data loaders
-    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
+    # Get data loaders and model
+    model, train_loader, val_loader, test_loader, denormalizer = get_model_and_loader(args, device)
 
-    # Initialize model, criterion, and optimizer
-    model = BiLSTMNWPOnly().to(device)
     latest_checkpoint = get_latest_checkpoint(args.checkpoint_dir)
     print(f'loading from {latest_checkpoint}')
     _, _ = load_checkpoint(latest_checkpoint, model, None)
