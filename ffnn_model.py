@@ -4,39 +4,22 @@ import torch.nn as nn
 nwp_input_size = 16  # NWP data has 16 features
 
 class WindPowerFFNN(nn.Module):
-    def __init__(self, input_dim=nwp_input_size, hidden_dim=128, output_dim=96):
+    def __init__(self, input_dim=nwp_input_size, output_dim=1):
         super(WindPowerFFNN, self).__init__()
-        
-        # First hidden layer
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.sigmoid1 = nn.Sigmoid()
-        
-        # Second hidden layer
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.sigmoid2 = nn.Sigmoid()
-        
-        # Third hidden layer
-        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
-        self.sigmoid3 = nn.Sigmoid()
-        
-        # Output layer
-        self.output = nn.Linear(48*hidden_dim, output_dim)
-        
-    def forward(self, x):
-        # Pass through the first hidden layer
-        x = self.fc1(x)
-        x = self.sigmoid1(x)
-        
-        # Pass through the second hidden layer
-        x = self.fc2(x)
-        x = self.sigmoid2(x)
-        
-        # Pass through the third hidden layer
-        x = self.fc3(x)
-        x = self.sigmoid3(x)
-        
-        # Till now x is always of shape [B, 48, hidden_dim]
-        # Output layer
-        output = self.output(x.reshape(x.shape[0], -1))  # [B, -1]
-        
+        self.nwp_mlp = nn.Linear(48, 96)
+        self.fc = nn.Linear(input_dim, output_dim)
+        self.sigmoid = nn.Sigmoid()
+        # Batch Norm Layer, without which the model fails to perform
+        self.batch_norm = nn.BatchNorm1d(nwp_input_size)
+
+
+    def forward(self, nwp_data):
+        nwp_norm = (nwp_data - nwp_data.min()) / (nwp_data.max() - nwp_data.min())
+        nwp_data = self.nwp_mlp(nwp_norm.transpose(-1, -2)).transpose(-1, -2)  # [B, 96, nwp_input_size]
+        # Apply batch normalization across the time dimension
+        nwp_data = nwp_data.permute(0, 2, 1)  # Switch batch and feature dimensions
+        nwp_data = self.batch_norm(nwp_data)
+        nwp_data = nwp_data.permute(0, 2, 1)  # Switch them back
+        output = self.fc(nwp_data)  # [B, 96, output_dim]
+        output = self.sigmoid(output).squeeze(-1)
         return output
