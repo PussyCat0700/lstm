@@ -1,3 +1,4 @@
+import csv
 import os
 from draw import plot_predictions_vs_ground_truth
 import argparse
@@ -86,28 +87,17 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         # Validation loop
         model.eval()
         val_loss = 0.0
-        all_outputs = []
-        all_gts = []
         with torch.no_grad():
             for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-                outputs = denormalizer(model(nwp_data))
-                gts = denormalizer(Y)
-                loss = criterion(outputs, gts)
-                all_outputs.append(outputs.detach().cpu().numpy())
-                all_gts.append(gts.detach().cpu().numpy())
+                outputs = model(nwp_data)
+                loss = criterion(denormalizer(outputs), denormalizer(Y))
                 val_loss += loss.item()
                 
                 if use_wandb:
                     wandb.log({"val_loss": loss.item(), "epoch": epoch})
                 else:
                     writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + batch_idx)
-        all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
-        for key, metric in all_metrics.items():
-            if use_wandb:
-                wandb.log({f"val_{key}": metric, "epoch": epoch})
-            else:
-                writer.add_scalar(f"{key}/val", loss.item(), (epoch+1) * len(val_loader))
         val_loss /= len(val_loader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Validation Loss: {val_loss:.4f}")
         
@@ -151,18 +141,36 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     # Testing loop
     model.eval()
     test_loss = 0.0
+    all_outputs = []
+    all_gts = []
     with torch.no_grad():
         for batch_idx, (X, Y, nwp_data) in enumerate(test_loader):
             X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-            outputs = model(nwp_data)
-            loss = criterion(denormalizer(outputs), denormalizer(Y))
-            test_loss += loss.item()
+            outputs = denormalizer(model(nwp_data))
+            gts = denormalizer(Y)
+            loss = criterion(outputs, gts)
+            all_outputs.append(outputs.detach().cpu().numpy())
+            all_gts.append(gts.detach().cpu().numpy())
             
             if use_wandb:
                 wandb.log({"test_loss": loss.item()})
             else:
                 writer.add_scalar("Loss/test", loss.item(), batch_idx)
-    
+    all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
+    def write_csv():
+        csv_filename = os.path.join(checkpoint_dir, 'metrics.csv')
+        with open(csv_filename, mode='w', newline='') as file:
+            csv_writer = csv.writer(file)
+            # 写入表头（字典的键）
+            csv_writer.writerow(all_metrics.keys())
+            # 写入内容（字典的值）
+            csv_writer.writerow(all_metrics.values())
+    write_csv()
+    for key, metric in all_metrics.items():
+        if use_wandb:
+            wandb.log({f"test_{key}": metric})
+        else:
+            writer.add_scalar(f"{key}/test", metric, len(test_loader))
     test_loss /= len(test_loader)
     print(f"Test Loss: {test_loss:.4f}")
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")

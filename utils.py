@@ -27,14 +27,13 @@ def get_model_and_loader(args, device):
 
 
 def compute_all_metrics(preds, gts, cap):
-    gts = np.array(gts).flatten()
-    preds = np.array(preds).flatten()
-
+    preds = np.concatenate(preds, axis=0).flatten()
+    gts = np.concatenate(gts, axis=0).flatten()
     rmse = CR(preds, gts, cap)*100
     mae = MAE(preds, gts, cap)*100
     gte = compute_gte(gts, preds)
     pte, extrema_indices = compute_pte(gts, preds)
-    tde = time_delay_error(gts, preds)
+    # tde = time_delay_error(gts, preds)
     correlation_matrix = np.corrcoef(preds, gts)
     r = correlation_matrix[0, 1]
     return {
@@ -42,6 +41,6 @@ def compute_all_metrics(preds, gts, cap):
         "mae": mae,
         "gte": gte,
         "pte": pte,
-        "tde": tde,
+        # "tde": tde,
         "r": r,
     }
