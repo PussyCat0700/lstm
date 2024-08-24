@@ -1,6 +1,7 @@
 import os
 from draw import plot_predictions_vs_ground_truth
 from lstm_model import BiLSTMNWPOnly
+from ffnn_model import WindPowerFFNN
 import argparse
 import torch
 import torch.nn as nn
@@ -11,6 +12,7 @@ import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils import get_parameter_number
+from constants import LSTM, FFNN, model_type_dict
 
 
 def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=100):
@@ -25,12 +27,12 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(
-            project="power-forecasting-lstm",
+            project=f"power-forecasting-183",
             config={
                 "epochs": num_epochs,
                 "batch_size": train_loader.batch_size,
                 "learning_rate": optimizer.param_groups[0]['lr'],
-                "architecture": "BiLSTMWithFusion"
+                "architecture": args.model_type,
             },
             name=os.path.basename(checkpoint_dir),    
         )
@@ -173,17 +175,23 @@ def main(args):
     # Set up device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Get data loaders
-    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
-
-    # Initialize model, criterion, and optimizer
-    model = BiLSTMNWPOnly().to(device)
+    if args.model_type == LSTM:
+        # Get data loaders
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
+        # Initialize model, criterion, and optimizer
+        model = BiLSTMNWPOnly().to(device)
+    elif args.model_type == FFNN:
+        # Get data loaders
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        # Initialize model, criterion, and optimizer
+        model = WindPowerFFNN().to(device)
 
     # Train the model
     train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
+    parser.add_argument("model_type", type=int, choices=[0, 1])
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for the optimizer")
@@ -192,6 +200,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")
-    
     args = parser.parse_args()
+    args.model_type = model_type_dict[args.model_type]
+    print(f'now training {args.model_type}')
     main(args)

@@ -84,9 +84,9 @@ class PowerPlantDailyDataset(PowerPlantDataset):
     2. nwp的时差
     08:00:00->00:00:00 -8h
     """
-    def __init__(self, split, plant_number, power_minmax=None):
+    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
         super().__init__(split, plant_number, power_minmax)
-        self.training = split == "train"
+        self.with_extra_span = with_extra_span
     
     def __len__(self):
         return len(self.data) // 96 -  2
@@ -103,7 +103,7 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         X_norm = self.normalize_power_data(X)
         
         # Next day data
-        if self.training:
+        if self.with_extra_span:
             # total span: 63+96=159
             next_start_time = start_time + pd.DateOffset(days=1)  # day1 start 08:15:00
             next_end_time = next_start_time + pd.DateOffset(hours=15, minutes=45) + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
@@ -122,11 +122,11 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
 
 
-def get_data_loaders_and_denormalizer(plant_number, batch_size):
-    train_dataset = PowerPlantDailyDataset("train", plant_number)
+def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
+    train_dataset = PowerPlantDailyDataset("train", plant_number, with_extra_span=with_extra_span)
     power_minmax = train_dataset.power_minmax
-    valid_dataset = PowerPlantDailyDataset("valid", plant_number, power_minmax)
-    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
+    valid_dataset = PowerPlantDailyDataset("valid", plant_number, power_minmax, with_extra_span=False)
+    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax, with_extra_span=False)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
