@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from utils import get_model_and_loader, get_parameter_number
+from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import model_type_dict
 
 
@@ -86,18 +86,28 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         # Validation loop
         model.eval()
         val_loss = 0.0
+        all_outputs = []
+        all_gts = []
         with torch.no_grad():
             for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-                outputs = model(nwp_data)
-                loss = criterion(denormalizer(outputs), denormalizer(Y))
+                outputs = denormalizer(model(nwp_data))
+                gts = denormalizer(Y)
+                loss = criterion(outputs, gts)
+                all_outputs.append(outputs.detach().cpu().numpy())
+                all_gts.append(gts.detach().cpu().numpy())
                 val_loss += loss.item()
                 
                 if use_wandb:
                     wandb.log({"val_loss": loss.item(), "epoch": epoch})
                 else:
                     writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + batch_idx)
-        
+        all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
+        for key, metric in all_metrics.items():
+            if use_wandb:
+                wandb.log({f"val_{key}": metric, "epoch": epoch})
+            else:
+                writer.add_scalar(f"{key}/val", loss.item(), (epoch+1) * len(val_loader))
         val_loss /= len(val_loader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Validation Loss: {val_loss:.4f}")
         
