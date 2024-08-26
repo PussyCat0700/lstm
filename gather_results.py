@@ -10,9 +10,11 @@ args = parser.parse_args()
 
 ckpt_dir = "/data1/yfliu/windpower_baseline"
 if args.model_type_number == 0:
-    subdir = "lstm"
+    subdir = "lstm_hourly"
 elif args.model_type_number == 1:
-    subdir = "ffnn"
+    subdir = "ffnn_hourly"
+elif args.model_type_number == 2:
+    subdir = "gpnn_hourly"
 ckpt_dir = os.path.join(ckpt_dir, subdir)
 output_file = f"averaged_metrics_{subdir}.csv"
 
