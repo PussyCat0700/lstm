@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file
 
 class PowerPlantDataset(Dataset):
-    def __init__(self, split, plant_number, power_minmax=None):
+    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
         """
         Args:
             csv_file (string): Path to the CSV file with power generation data.
@@ -33,6 +33,7 @@ class PowerPlantDataset(Dataset):
             self.power_minmax = power_minmax
         self.power_min = self.power_minmax[0]
         self.power_max = self.power_minmax[1]
+        self.with_extra_span = with_extra_span
 
         # Ensure the plant number is valid
         if self.plant_number < 0 or self.plant_number >= self.data.shape[1]:
@@ -52,50 +53,18 @@ class PowerPlantDataset(Dataset):
         return start_time
 
     def __getitem__(self, idx):
-        # Current day data
-        start_time = self._get_start_time(idx)
-        end_time = start_time + pd.DateOffset(hours=23, minutes=45)
-        X = self.data.loc[start_time:end_time].iloc[:, self.plant_number].values
-        X_norm = self.normalize_power_data(X)
-        
-        # Next day data
-        next_start_time = start_time + pd.DateOffset(days=1)
-        next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)
-        Y = self.data.loc[next_start_time:next_end_time].iloc[:, self.plant_number].values
-        Y_norm = self.normalize_power_data(Y)
-
-        # Load the corresponding NWP data
-        nwp_file = os.path.join(self.nwp_dir, f"{start_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
-        nwp_data = np.load(nwp_file)
-
-        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
-
-
-class PowerPlantDailyDataset(PowerPlantDataset):
-    """
-    1. csv不需要倒时差
-    - 历史数据起始 终止
-    day0					day1
-    08:15:00【含】-> +96 08:00:00【含】
-    - 预测数据起始 终止
-    day1					day1			day2[00:00:00-23:45:00]
-    +96 08:15:00【含】-> +15h45m(dropped)+24h(要的)时刻 【含】【要不就192个】
-    评估：
-    2. nwp的时差
-    08:00:00->00:00:00 -8h
-    """
-    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
-        super().__init__(split, plant_number, power_minmax)
-        self.with_extra_span = with_extra_span
-    
-    def __len__(self):
-        return len(self.data) // 96 -  2
-
-    def _get_start_time(self, idx):
-        start_time = self.data.index[idx*96].replace(hour=8, minute=15, second=0, microsecond=0)
-        return start_time
-    
-    def __getitem__(self, idx):
+        """
+        1. csv不需要倒时差
+        - 历史数据起始 终止
+        day0					day1
+        08:15:00【含】-> +96 08:00:00【含】
+        - 预测数据起始 终止
+        day1					day1			day2[00:00:00-23:45:00]
+        +96 08:15:00【含】-> +15h45m(dropped)+24h(要的)时刻 【含】【要不就192个】
+        评估：
+        2. nwp的时差
+        08:00:00->00:00:00 -8h
+        """
         # Current day data
         start_time = self._get_start_time(idx)  # day0
         end_time = start_time + pd.DateOffset(hours=23, minutes=45)  # day1
@@ -115,17 +84,37 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        nwp_time = end_time - pd.DateOffset(hours=8)
         nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
         nwp_data = np.load(nwp_file)
 
         return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
 
 
+class PowerPlantDailyDataset(PowerPlantDataset):
+    def __len__(self):
+        return len(self.data) // 96 -  2  # Daily
+
+    def _get_start_time(self, idx):
+        offset = 1 + 4*8  # 08:15:00
+        start_time = self.data.index[idx*96+offset].replace(second=0, microsecond=0)
+        return start_time
+
+
+class PowerPlantHourlyDataset(PowerPlantDataset):
+    def __len__(self):
+        return len(self.data) // 4 - (24+16+24)  # Hourly
+    
+    def _get_start_time(self, idx):
+        offset = 1  # hh:15:00
+        start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
+        return start_time
+
+
 def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
-    train_dataset = PowerPlantDailyDataset("train", plant_number, with_extra_span=with_extra_span)
+    train_dataset = PowerPlantHourlyDataset("train", plant_number, with_extra_span=with_extra_span)
     power_minmax = train_dataset.power_minmax
-    valid_dataset = PowerPlantDailyDataset("valid", plant_number, power_minmax, with_extra_span=False)
+    valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax, with_extra_span=False)
     test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax, with_extra_span=False)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -155,3 +144,13 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
     start_epoch = checkpoint['epoch']
     loss = checkpoint.get('loss', None)
     return start_epoch, loss
+
+
+if __name__ == '__main__':
+    # test func
+    train_loader, val_loader, test_loader, _ = get_data_loaders_and_denormalizer(0, 128)
+    from tqdm import tqdm
+    for loader in [train_loader, val_loader, test_loader,]:
+        pbar = tqdm(loader)
+        for batch in pbar:
+            pass
