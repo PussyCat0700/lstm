@@ -5,7 +5,7 @@ import pandas as pd
 
 # Directory containing the subdirectories with metrics.csv files
 parser = argparse.ArgumentParser()
-parser.add_argument("model_type_number", type=int, choices=[0, 1])
+parser.add_argument("model_type_number", type=int)
 args = parser.parse_args()
 
 ckpt_dir = "/data1/yfliu/windpower_baseline"
