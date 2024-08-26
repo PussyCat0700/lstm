@@ -48,7 +48,7 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
-    parser.add_argument("model_type", type=int, choices=[0, 1])
+    parser.add_argument("model_type", type=int)
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")

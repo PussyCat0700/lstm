@@ -10,3 +10,4 @@ wandb/**
 *.err
 *.out
 *.txt
+*.npy

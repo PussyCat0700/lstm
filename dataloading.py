@@ -4,7 +4,37 @@ import pandas as pd
 import numpy as np
 import os
 from torch.utils.data import DataLoader
-from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file
+from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file, nwp_max_file, nwp_min_file
+
+
+def get_global_min_max_weather(weather_data_dir):
+    if (not os.path.exists(nwp_max_file)) or (not os.path.join(nwp_min_file)): 
+        print('doing nwp minmax')
+        # 初始化最大值和最小值矩阵
+        global_max = np.full((183, 16), -np.inf)
+        global_min = np.full((183, 16), np.inf)
+
+        for file_path in os.listdir(weather_data_dir):
+            # 加载当前.npy文件
+            data = np.load(os.path.join(weather_data_dir, file_path))
+            
+            # 计算每个站点每个变量的最小值和最大值
+            local_max = np.max(data, axis=1)  # (183, 16)
+            local_min = np.min(data, axis=1)  # (183, 16)
+            
+            # 更新全局最大值和最小值
+            global_max = np.maximum(global_max, local_max)
+            global_min = np.minimum(global_min, local_min)
+
+        # 保存最终结果
+        np.save(nwp_max_file, global_max)
+        np.save(nwp_min_file, global_min)
+    else:
+        print('loading nwp minmax')
+        global_max = np.load(nwp_max_file)
+        global_min = np.load(nwp_min_file)
+    return global_min, global_max
+
 
 class PowerPlantDataset(Dataset):
     def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
@@ -34,7 +64,9 @@ class PowerPlantDataset(Dataset):
         self.power_min = self.power_minmax[0]
         self.power_max = self.power_minmax[1]
         self.with_extra_span = with_extra_span
-
+        # Fit the weather scaler based on all weather data from all farms
+        self.init_weather_minmax()
+        print('done doing weather.')
         # Ensure the plant number is valid
         if self.plant_number < 0 or self.plant_number >= self.data.shape[1]:
             raise ValueError(f"Invalid plant number: {self.plant_number}. Must be between 0 and {self.data.shape[1] - 1}.")
@@ -51,6 +83,13 @@ class PowerPlantDataset(Dataset):
     def _get_start_time(self, idx):
         start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
         return start_time
+    
+    # Function to fit the MinMaxScaler on the weather data
+    def init_weather_minmax(self):
+        # 提取该场站的最大值和最小值
+        global_min, global_max = get_global_min_max_weather(source_nwp_dir)
+        self.station_nwp_max = global_max[self.plant_number]  # (16,)
+        self.station_nwp_min = global_min[self.plant_number]  # (16,)
 
     def __getitem__(self, idx):
         """
@@ -87,8 +126,9 @@ class PowerPlantDataset(Dataset):
         nwp_time = end_time - pd.DateOffset(hours=8)
         nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
         nwp_data = np.load(nwp_file)
+        nwp_data_scaled = (nwp_data - self.station_nwp_min) / (self.station_nwp_max - self.station_nwp_min)
 
-        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data[self.plant_number], dtype=torch.float32)
+        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data_scaled[self.plant_number], dtype=torch.float32)
 
 
 class PowerPlantDailyDataset(PowerPlantDataset):

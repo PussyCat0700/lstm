@@ -6,3 +6,5 @@ train_power_file = "./inputs/train_nmg_wf_history.csv"
 valid_power_file = "./inputs/valid_nmg_wf_history.csv"
 test_power_file = "./inputs/test_nmg_wf_history.csv"
 results_save_path = "/data1/yfliu/windpower_baseline/"
+nwp_min_file = './inputs/nwp_min.npy'
+nwp_max_file = './inputs/nwp_max.npy'
