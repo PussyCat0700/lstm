@@ -15,6 +15,8 @@ elif args.model_type_number == 1:
     subdir = "ffnn_hourly"
 elif args.model_type_number == 2:
     subdir = "gpnn_hourly"
+elif args.model_type_number == 3:
+    subdir = "xgboost"
 ckpt_dir = os.path.join(ckpt_dir, subdir)
 output_file = f"averaged_metrics_{subdir}.csv"
 

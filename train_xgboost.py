@@ -25,12 +25,12 @@ params_LGBM_wind_trading={
 save_path = XGBSavePath(args.plant_number)
 
 model=LGBMRegressor(**params_LGBM_wind_trading)
-_, Y_train, X_nwp, denormalizer = get_dataset_and_denormalizer_sklearn(0, "train", str(save_path))
-model.fit(X_nwp, Y_train)
+_, Y_train, X_nwp_train, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", str(save_path))
+model.fit(X_nwp_train, Y_train)
 with open(save_path.get_model_path(), "wb") as f:
     pickle.dump(model,f)
-_, Y_test, X_nwp, _ = get_dataset_and_denormalizer_sklearn(0, "test", str(save_path))
-preds_test = model.predict(X_nwp)
+_, Y_test, X_nwp_test, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", str(save_path))
+preds_test = model.predict(X_nwp_test)
 preds_test = denormalizer(preds_test)
 Y_test = denormalizer(Y_test)
 all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
