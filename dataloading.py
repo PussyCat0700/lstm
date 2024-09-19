@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file, nwp_max_file, nwp_min_file
 
 
@@ -151,6 +152,101 @@ class PowerPlantHourlyDataset(PowerPlantDataset):
         return start_time
 
 
+class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
+    """点对点的数据集，只需要整点的数据
+    当前整点数据对应40小时后的整点数据
+    """
+    def _get_start_time(self, idx):
+        offset = 0  # hh:00:00
+        start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
+        return start_time
+    
+    def __getitem__(self, idx):
+        """
+        1. csv不需要倒时差
+        - 当前时间day0 08:00:00
+        - 预测目标day2 00:00:00
+        评估：
+        2. nwp的时差
+        08:00:00->00:00:00 -8h
+        3. nwp到csv预测值需要偏移：40h
+        
+        returns:
+        X_norm/Y_norm: a single digit
+        nwp_data_scaled: shaped (16,)
+        """
+        # Current day data
+        x_time = self._get_start_time(idx)  # start
+        X = self.data.loc[x_time].iloc[self.plant_number]
+        X_norm = self.normalize_power_data(X)
+        
+        # Next day data
+        y_time = x_time + pd.DateOffset(hours=40)
+        Y = self.data.loc[y_time].iloc[self.plant_number]
+        Y_norm = self.normalize_power_data(Y)
+
+        # Load the corresponding NWP data
+        nwp_time = x_time - pd.DateOffset(hours=8)
+        nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
+        nwp_data = np.load(nwp_file)
+        nwp_data_scaled = (nwp_data - self.station_nwp_min) / (self.station_nwp_max - self.station_nwp_min)
+        nwp_data_scaled = nwp_data_scaled[self.plant_number][40-1]  # only 16 dims are left
+
+        return X_norm, Y_norm, nwp_data_scaled
+
+
+import csv
+
+def convert_torch_dataset_to_csv(dataset, folder_path):
+    # 创建文件夹（如果不存在）
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    # 定义保存的文件路径
+    X_file = os.path.join(folder_path, "X_norm.csv")
+    Y_file = os.path.join(folder_path, "Y_norm.csv")
+    nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
+
+    # 如果文件已存在，跳过保存步骤，避免覆盖
+    if os.path.exists(X_file) and os.path.exists(Y_file) and os.path.exists(nwp_file):
+        print(f"Files already exist at {folder_path}, loading them directly.")
+        return load_csv_data(X_file, Y_file, nwp_file)
+
+    print(f"Saving dataset to CSV in {folder_path}...")
+
+    # 打开文件，以写入模式逐步保存数据
+    with open(X_file, 'w', newline='') as f_X, \
+         open(Y_file, 'w', newline='') as f_Y, \
+         open(nwp_file, 'w', newline='') as f_nwp:
+
+        # 创建csv writer对象
+        writer_X = csv.writer(f_X)
+        writer_Y = csv.writer(f_Y)
+        writer_nwp = csv.writer(f_nwp)
+        for i in range(len(dataset)):
+            X_norm, Y_norm, nwp_data_scaled = dataset[i]
+            # 将每个样本写入csv文件
+            writer_X.writerow([X_norm,])        # 保存 X_norm
+            writer_Y.writerow([Y_norm,])        # 保存 Y_norm
+            writer_nwp.writerow(nwp_data_scaled.tolist())  # 保存nwp_data_scaled展平为一行
+
+    # 加载并返回CSV中的数据
+    return load_csv_data(X_file, Y_file, nwp_file)
+
+
+def load_csv_data(X_file, Y_file, nwp_file):
+    # 加载并转换为numpy数组
+    X = np.loadtxt(X_file, delimiter=',')
+    Y = np.loadtxt(Y_file, delimiter=',')
+    nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, 16)  # 恢复原来的形状
+
+    return X, Y, nwp
+
+def get_dataset_and_denormalizer_sklearn(plant_number, split):
+    dataset = PowerPlantSklearnHourlyDataset(split, plant_number)
+    X, Y, nwp = convert_torch_dataset_to_csv(dataset, f'here_{split}')  # TODO not here
+    return X, Y, nwp, dataset.denormalize_power_data
+
 def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
     train_dataset = PowerPlantHourlyDataset("train", plant_number, with_extra_span=with_extra_span)
     power_minmax = train_dataset.power_minmax
@@ -187,10 +283,4 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
-    # test func
-    train_loader, val_loader, test_loader, _ = get_data_loaders_and_denormalizer(0, 128)
-    from tqdm import tqdm
-    for loader in [train_loader, val_loader, test_loader,]:
-        pbar = tqdm(loader)
-        for batch in pbar:
-            pass
+    get_dataset_and_denormalizer_sklearn(0, "valid")
