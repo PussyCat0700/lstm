@@ -1,8 +1,9 @@
 import argparse
-import os
 import pickle
 from lightgbm import LGBMRegressor
 from dataloading import get_dataset_and_denormalizer_sklearn
+from draw import plot_predictions_vs_ground_truth_vanilla
+from utils import compute_all_metrics, write_csv
 from paths import XGBSavePath
 
 
@@ -24,7 +25,15 @@ params_LGBM_wind_trading={
 save_path = XGBSavePath(args.plant_number)
 
 model=LGBMRegressor(**params_LGBM_wind_trading)
-X_train, Y_label, X_nwp, denormalize_power_data = get_dataset_and_denormalizer_sklearn(0, "train")
-model.fit(X_nwp, Y_label)
+_, Y_train, X_nwp, denormalizer = get_dataset_and_denormalizer_sklearn(0, "train", str(save_path))
+model.fit(X_nwp, Y_train)
 with open(save_path.get_model_path(), "wb") as f:
     pickle.dump(model,f)
+_, Y_test, X_nwp, _ = get_dataset_and_denormalizer_sklearn(0, "test", str(save_path))
+preds_test = model.predict(X_nwp)
+preds_test = denormalizer(preds_test)
+Y_test = denormalizer(Y_test)
+all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
+print(all_metrics)
+write_csv(save_path.get_metrics_path(), all_metrics)
+plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test, save_path.get_png_path())

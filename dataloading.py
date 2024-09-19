@@ -223,7 +223,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
         writer_X = csv.writer(f_X)
         writer_Y = csv.writer(f_Y)
         writer_nwp = csv.writer(f_nwp)
-        for i in range(len(dataset)):
+        pbar = tqdm(range(len(dataset)))
+        for i in pbar:
             X_norm, Y_norm, nwp_data_scaled = dataset[i]
             # 将每个样本写入csv文件
             writer_X.writerow([X_norm,])        # 保存 X_norm
@@ -242,9 +243,9 @@ def load_csv_data(X_file, Y_file, nwp_file):
 
     return X, Y, nwp
 
-def get_dataset_and_denormalizer_sklearn(plant_number, split):
+def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number)
-    X, Y, nwp = convert_torch_dataset_to_csv(dataset, f'here_{split}')  # TODO not here
+    X, Y, nwp = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
     return X, Y, nwp, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
@@ -283,4 +284,4 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
-    get_dataset_and_denormalizer_sklearn(0, "valid")
+    get_dataset_and_denormalizer_sklearn(0, "valid", "here")

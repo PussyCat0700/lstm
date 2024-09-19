@@ -1,3 +1,4 @@
+import csv
 import numpy as np
 from constants import FFNN, GPNN, LSTM
 from dataloading import get_data_loaders_and_denormalizer
@@ -32,8 +33,10 @@ def get_model_and_loader(args, device):
 
 
 def compute_all_metrics(preds, gts, cap):
-    preds = np.concatenate(preds, axis=0).flatten()
-    gts = np.concatenate(gts, axis=0).flatten()
+    if isinstance(preds, list):
+        preds = np.concatenate(preds, axis=0).flatten()
+    if isinstance(gts, list):
+        gts = np.concatenate(gts, axis=0).flatten()
     rmse = CR(preds, gts, cap)*100
     mae = MAE(preds, gts, cap)*100
     gte = compute_gte(gts, preds)
@@ -49,3 +52,12 @@ def compute_all_metrics(preds, gts, cap):
         # "tde": tde,
         "r": r,
     }
+
+
+def write_csv(csv_filename, all_metrics):
+    with open(csv_filename, mode='w', newline='') as file:
+        csv_writer = csv.writer(file)
+        # 写入表头（字典的键）
+        csv_writer.writerow(all_metrics.keys())
+        # 写入内容（字典的值）
+        csv_writer.writerow(all_metrics.values())
