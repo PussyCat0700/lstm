@@ -62,7 +62,7 @@ def get_data(overwrite=False):
         # Handle missing data (-999) with linear interpolation
         data = interpolate_missing_data(data)
         data['Unnamed: 0'] = pd.to_datetime(data['Unnamed: 0'])
-        split_date = data['Unnamed: 0'].min() + pd.DateOffset(years=1) + pd.DateOffset(months=1)
+        split_date = data['Unnamed: 0'].min() + pd.DateOffset(years=1)
         training_set = data[data['Unnamed: 0'] < split_date]
         testing_set = data[data['Unnamed: 0'] >= split_date]
         # Save the processed data

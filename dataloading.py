@@ -194,10 +194,17 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = x_time - pd.DateOffset(hours=8)
+        nwp_time = y_time - pd.DateOffset(hours=8)
         nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
         nwp_data = np.load(nwp_file)
-        nwp_data_scaled = (nwp_data - self.station_nwp_min) / (self.station_nwp_max - self.station_nwp_min)
+        range_values = self.station_nwp_max - self.station_nwp_min
+        nwp_data_scaled = np.zeros_like(nwp_data)
+        epsilon = 1e-10
+        for i in range(nwp_data.shape[-1]):
+            if abs(range_values[i]) < epsilon:  # 判断是否接近于0
+                nwp_data_scaled[..., i] = 1  # 归一化为常数1
+            else:
+                nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
         nwp_data_scaled = nwp_data_scaled[self.plant_number][40-1]  # only 16 dims are left
 
         return X_norm, Y_norm, nwp_data_scaled
@@ -214,11 +221,6 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
     X_file = os.path.join(folder_path, "X_norm.csv")
     Y_file = os.path.join(folder_path, "Y_norm.csv")
     nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
-
-    # 如果文件已存在，跳过保存步骤，避免覆盖
-    if os.path.exists(X_file) and os.path.exists(Y_file) and os.path.exists(nwp_file):
-        print(f"Files already exist at {folder_path}, loading them directly.")
-        return load_csv_data(X_file, Y_file, nwp_file)
 
     print(f"Saving dataset to CSV in {folder_path}...")
 
