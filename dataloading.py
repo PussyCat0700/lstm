@@ -12,16 +12,18 @@ def get_global_min_max_weather(weather_data_dir):
     if (not os.path.exists(nwp_max_file)) or (not os.path.join(nwp_min_file)): 
         print('doing nwp minmax')
         # 初始化最大值和最小值矩阵
-        global_max = np.full((183, 16), -np.inf)
-        global_min = np.full((183, 16), np.inf)
 
         for file_path in os.listdir(weather_data_dir):
             # 加载当前.npy文件
             data = np.load(os.path.join(weather_data_dir, file_path))
-            
+            global_min = global_max = None
+            if global_max is None:
+                global_max = np.full((data.shape[0], data.shape[-1]), -np.inf)
+            if global_min is None:
+                global_min = np.full((data.shape[0], data.shape[-1]), np.inf)
             # 计算每个站点每个变量的最小值和最大值
-            local_max = np.max(data, axis=1)  # (183, 16)
-            local_min = np.min(data, axis=1)  # (183, 16)
+            local_max = np.max(data, axis=1)  # (# of stations, # of features)
+            local_min = np.min(data, axis=1)  # (# of stations, # of features)
             
             # 更新全局最大值和最小值
             global_max = np.maximum(global_max, local_max)
@@ -89,8 +91,8 @@ class PowerPlantDataset(Dataset):
     def init_weather_minmax(self):
         # 提取该场站的最大值和最小值
         global_min, global_max = get_global_min_max_weather(source_nwp_dir)
-        self.station_nwp_max = global_max[self.plant_number]  # (16,)
-        self.station_nwp_min = global_min[self.plant_number]  # (16,)
+        self.station_nwp_max = global_max[self.plant_number]  # (nwp_input_size,)
+        self.station_nwp_min = global_min[self.plant_number]  # (nwp_input_size,)
 
     def __getitem__(self, idx):
         """
@@ -127,8 +129,14 @@ class PowerPlantDataset(Dataset):
         nwp_time = end_time - pd.DateOffset(hours=8)
         nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
         nwp_data = np.load(nwp_file)
-        nwp_data_scaled = (nwp_data - self.station_nwp_min) / (self.station_nwp_max - self.station_nwp_min)
-
+        range_values = self.station_nwp_max - self.station_nwp_min
+        nwp_data_scaled = np.zeros_like(nwp_data)
+        epsilon = 1e-10
+        for i in range(nwp_data.shape[-1]):
+            if abs(range_values[i]) < epsilon:  # 判断是否接近于0
+                nwp_data_scaled[..., i] = 1  # 归一化为常数1
+            else:
+                nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
         return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data_scaled[self.plant_number], dtype=torch.float32)
 
 

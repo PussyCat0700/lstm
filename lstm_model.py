@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from paths import nwp_input_size
 
 
 # Hyperparameters
-nwp_input_size = 16  # NWP data has 16 features
 power_input_size = 1  # Power data is single-channel, so input size is 1
 hidden_size = 100
 output_size = 96  # Predicting the next 24 hours, 15 minutes per unit

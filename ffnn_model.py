@@ -1,8 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
+from paths import nwp_input_size
 
-
-nwp_input_size = 16  # NWP data has 16 features
 
 class WindPowerFFNN(nn.Module):
     def __init__(self, input_dim=nwp_input_size*48):

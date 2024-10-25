@@ -1,16 +1,26 @@
 # Read only
 import os
+import yaml
 
 
-source_power_file = "/data1/yfliu/windpower_baseline/nmg_wf_history.csv"
-source_nwp_dir = "/data1/yfliu/windpower_baseline/weather_history"
-# Writable
-train_power_file = "./inputs/train_nmg_wf_history.csv"
-valid_power_file = "./inputs/valid_nmg_wf_history.csv"
-test_power_file = "./inputs/test_nmg_wf_history.csv"
-results_save_path = "/data1/yfliu/windpower_baseline/"
-nwp_min_file = './inputs/nwp_min.npy'
-nwp_max_file = './inputs/nwp_max.npy'
+use_china = True
+if use_china:
+    cfg_filename = './conf/china.yaml'
+else:
+    cfg_filename = './conf/183.yaml'
+with open(cfg_filename, 'r') as file:
+    config = yaml.safe_load(file)
+
+source_power_file = config['paths']['source_power_file']
+source_nwp_dir = config['paths']['source_nwp_dir']
+# writable
+train_power_file = config['paths']['train_power_file']
+valid_power_file = config['paths']['valid_power_file']
+test_power_file = config['paths']['test_power_file']
+results_save_path = config['paths']['results_save_path']
+nwp_min_file = config['paths']['nwp_min_file']
+nwp_max_file = config['paths']['nwp_max_file']
+nwp_input_size = config['params']['nwp_input_size']  # NWP data has 16 features
 
 
 class BaseSavePath:
