@@ -5,7 +5,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file, nwp_max_file, nwp_min_file
+from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file, nwp_max_file, nwp_min_file, nwp_input_size
 
 
 def get_global_min_max_weather(weather_data_dir):
@@ -181,7 +181,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         
         returns:
         X_norm/Y_norm: a single digit
-        nwp_data_scaled: shaped (16,)
+        nwp_data_scaled: shaped (nwp_input_size,)
         """
         # Current day data
         x_time = self._get_start_time(idx)  # start
@@ -205,7 +205,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        nwp_data_scaled = nwp_data_scaled[self.plant_number][40-1]  # only 16 dims are left
+        nwp_data_scaled = nwp_data_scaled[self.plant_number][40-1]  # only nwp_input_dim is left
 
         return X_norm, Y_norm, nwp_data_scaled
 
@@ -249,7 +249,7 @@ def load_csv_data(X_file, Y_file, nwp_file):
     # 加载并转换为numpy数组
     X = np.loadtxt(X_file, delimiter=',')
     Y = np.loadtxt(Y_file, delimiter=',')
-    nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, 16)  # 恢复原来的形状
+    nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, nwp_input_size)  # 恢复原来的形状
 
     return X, Y, nwp
 
