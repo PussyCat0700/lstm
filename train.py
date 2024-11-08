@@ -71,6 +71,11 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             optimizer.zero_grad()
             outputs = model(nwp_data)
             loss = criterion(denormalizer(outputs), denormalizer(Y))
+            if torch.isnan(loss):
+                print("NaN detected in training loss. Stopping training.")
+                with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
+                    f.write("NaN detected in training loss at batch index {}.".format(batch_idx))
+                exit()
             loss.backward()
             optimizer.step()
             
@@ -92,6 +97,11 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
                 outputs = model(nwp_data)
                 loss = criterion(denormalizer(outputs), denormalizer(Y))
+                if torch.isnan(loss):
+                    print("NaN detected in validation loss. Stopping training.")
+                    with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
+                        f.write("NaN detected in validation loss at batch index {}.".format(batch_idx))
+                    exit()
                 val_loss += loss.item()
                 
                 if use_wandb:

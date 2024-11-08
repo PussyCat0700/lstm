@@ -7,6 +7,8 @@ from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
 from utils import compute_all_metrics, write_csv
 from paths import GPCFSavePath
+import traceback
+import os
 
 
 parser = argparse.ArgumentParser()
@@ -30,11 +32,39 @@ model.fit(X_nwp_train, Y_train)
 with open(save_path.get_model_path(), "wb") as f:
     pickle.dump(model,f)
 _, Y_test, X_nwp_test, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", str(save_path))
-preds_test = model.predict(X_nwp_test)
-preds_test = denormalizer(preds_test)
-preds_test = np.clip(preds_test, 0, None)
-Y_test = denormalizer(Y_test)
-all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
-print(all_metrics)
-write_csv(save_path.get_metrics_path(), all_metrics)
-plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test, save_path.get_png_path())
+
+
+try:
+    preds_test = model.predict(X_nwp_test)
+    preds_test = denormalizer(preds_test)
+    preds_test = np.clip(preds_test, 0, None)
+    Y_test = denormalizer(Y_test)
+    all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
+    print(all_metrics)
+    write_csv(save_path.get_metrics_path(), all_metrics)
+    plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test, save_path.get_png_path())
+
+except ValueError as e:
+    # 检查是否为NaN相关的ValueError
+    if "Input contains NaN" in str(e):
+        print("NaN-related ValueError detected.")
+        
+        # 创建NAN_FOUND文件
+        with open(os.path.join(str(save_path), "NAN_FOUND"), "w") as f:
+            f.write("NaN-related ValueError detected.")
+            
+        # 终止程序
+        exit()
+    else:
+        # 对于其他ValueError类型，创建OTHER_FOUND文件并保存堆栈信息
+        with open(os.path.join(str(save_path), "OTHER_FOUND"), "w") as f:
+            f.write("Other ValueError detected:\n")
+            f.write(traceback.format_exc())
+        exit()
+        
+except Exception as e:
+    # 捕获非ValueError的其他异常，生成OTHER_FOUND文件并记录堆栈信息
+    with open(os.path.join(str(save_path), "OTHER_FOUND"), "w") as f:
+        f.write("Non-ValueError exception detected:\n")
+        f.write(traceback.format_exc())
+    exit()
