@@ -1,6 +1,7 @@
 import argparse
 import os
 import pandas as pd
+from paths import results_save_path
 
 
 # Directory containing the subdirectories with metrics.csv files
@@ -8,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("model_type_number", type=int)
 args = parser.parse_args()
 
-ckpt_dir = "/data1/yfliu/windpower_baseline"
+ckpt_dir = results_save_path
 if args.model_type_number == 0:
     subdir = "lstm_hourly"
 elif args.model_type_number == 1:
