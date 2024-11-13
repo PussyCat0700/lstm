@@ -23,10 +23,12 @@ elif args.model_type_number == 4:
 ckpt_dir = os.path.join(ckpt_dir, subdir)
 output_file = f"averaged_metrics_{subdir}.csv"
 filtered_record_file = f"filtered_stations_{subdir}.txt"
+extreme_large_file = f"toolargecap_stations_{subdir}.txt"
 
 # Initialize an empty DataFrame to store metrics from all files
 all_metrics = []
 all_filtered = []
+all_extreme_large = []
 # Loop through all subdirectories in ckpt_dir
 for subdir in os.listdir(ckpt_dir):
     subdir_path = os.path.join(ckpt_dir, subdir)
@@ -38,12 +40,18 @@ for subdir in os.listdir(ckpt_dir):
         # Read the metrics.csv and append to the list
         df = pd.read_csv(metrics_file)
         df['station'] = station_number
-        all_metrics.append(df)
+        if df["rmse"][0] >= 0:
+            all_metrics.append(df)
+        else:
+            all_extreme_large.append(station_number)
     else:
         all_filtered.append(station_number)
 
 with open(filtered_record_file, 'w') as f:
     f.writelines([x+'\n' for x in all_filtered])
+
+with open(extreme_large_file, 'w') as f:
+    f.writelines([x+'\n' for x in all_extreme_large])
 
 # Combine all metrics into a single DataFrame
 if all_metrics:
