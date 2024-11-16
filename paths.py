@@ -3,11 +3,7 @@ import os
 import yaml
 
 
-use_china = True
-if use_china:
-    cfg_filename = './conf/china.yaml'
-else:
-    cfg_filename = './conf/183.yaml'
+cfg_filename = './conf/solar_338.yaml'
 with open(cfg_filename, 'r') as file:
     config = yaml.safe_load(file)
 

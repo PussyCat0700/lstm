@@ -18,12 +18,12 @@ def get_global_min_max_weather(weather_data_dir):
             data = np.load(os.path.join(weather_data_dir, file_path))
             global_min = global_max = None
             if global_max is None:
-                global_max = np.full((data.shape[0], data.shape[-1]), -np.inf)
+                global_max = np.full((data.shape[-1]), -np.inf)
             if global_min is None:
-                global_min = np.full((data.shape[0], data.shape[-1]), np.inf)
-            # 计算每个站点每个变量的最小值和最大值
-            local_max = np.max(data, axis=1)  # (# of stations, # of features)
-            local_min = np.min(data, axis=1)  # (# of stations, # of features)
+                global_min = np.full((data.shape[-1]), np.inf)
+            # 计算每个变量的最小值和最大值
+            local_max = np.max(data, axis=0) 
+            local_min = np.min(data, axis=0)
             
             # 更新全局最大值和最小值
             global_max = np.maximum(global_max, local_max)
@@ -87,12 +87,27 @@ class PowerPlantDataset(Dataset):
         start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
         return start_time
     
+    def _get_nwp(self, nwp_time):
+        fixed_times = pd.to_datetime([
+            f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 12:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 18:00:00"
+        ])
+        valid_times = [t for t in fixed_times if t <= nwp_time]
+        closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H_%M_%S')}_338.npy")
+        nwp_data = np.load(nwp_file)
+        hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
+        nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
+        return nwp_data_trunc
+    
     # Function to fit the MinMaxScaler on the weather data
     def init_weather_minmax(self):
         # 提取该场站的最大值和最小值
         global_min, global_max = get_global_min_max_weather(source_nwp_dir)
-        self.station_nwp_max = global_max[self.plant_number]  # (nwp_input_size,)
-        self.station_nwp_min = global_min[self.plant_number]  # (nwp_input_size,)
+        self.station_nwp_max = global_max  # (nwp_input_size,)
+        self.station_nwp_min = global_min  # (nwp_input_size,)
 
     def __getitem__(self, idx):
         """
@@ -127,8 +142,7 @@ class PowerPlantDataset(Dataset):
 
         # Load the corresponding NWP data
         nwp_time = end_time - pd.DateOffset(hours=8)
-        nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
-        nwp_data = np.load(nwp_file)
+        nwp_data = self._get_nwp(nwp_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
         epsilon = 1e-10
@@ -195,8 +209,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
 
         # Load the corresponding NWP data
         nwp_time = y_time - pd.DateOffset(hours=8)
-        nwp_file = os.path.join(self.nwp_dir, f"{nwp_time.strftime('%Y-%m-%d_%H:%M:%S')}.npy")
-        nwp_data = np.load(nwp_file)
+        nwp_data = self._get_nwp(nwp_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
         epsilon = 1e-10
@@ -205,7 +218,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        nwp_data_scaled = nwp_data_scaled[self.plant_number][40-1]  # only nwp_input_dim is left
+        nwp_data_scaled = nwp_data_scaled[40-1]  # only nwp_input_dim is left
 
         return X_norm, Y_norm, nwp_data_scaled
 
