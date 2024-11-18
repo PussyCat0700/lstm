@@ -60,8 +60,8 @@ class PowerPlantDataset(Dataset):
         self.plant_number = plant_number
         if power_minmax is None:
             self.power_minmax = [
-                max(0.0, self.data.min()[self.plant_number]),
-                self.data.max()[self.plant_number]]
+                max(0.0, self.data.min()[0]),
+                self.data.max()[0]]
         else:
             self.power_minmax = power_minmax
         self.power_min = self.power_minmax[0]
@@ -70,9 +70,6 @@ class PowerPlantDataset(Dataset):
         # Fit the weather scaler based on all weather data from all farms
         self.init_weather_minmax()
         print('done doing weather.')
-        # Ensure the plant number is valid
-        if self.plant_number < 0 or self.plant_number >= self.data.shape[1]:
-            raise ValueError(f"Invalid plant number: {self.plant_number}. Must be between 0 and {self.data.shape[1] - 1}.")
 
     def normalize_power_data(self, data):
         return (data - self.power_min) / (self.power_max - self.power_min)
@@ -96,7 +93,7 @@ class PowerPlantDataset(Dataset):
         ])
         valid_times = [t for t in fixed_times if t <= nwp_time]
         closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H_%M_%S')}_338.npy")
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H_%M_%S')}_{self.plant_number}.npy")
         nwp_data = np.load(nwp_file)
         hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
         nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
@@ -125,7 +122,7 @@ class PowerPlantDataset(Dataset):
         # Current day data
         start_time = self._get_start_time(idx)  # day0
         end_time = start_time + pd.DateOffset(hours=23, minutes=45)  # day1
-        X = self.data.loc[start_time:end_time].iloc[:, self.plant_number].values
+        X = self.data.loc[start_time:end_time].iloc[:, 0].values
         X_norm = self.normalize_power_data(X)
         
         # Next day data
@@ -137,7 +134,7 @@ class PowerPlantDataset(Dataset):
             # total span: 96
             next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
             next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
-        Y = self.data.loc[next_start_time:next_end_time].iloc[:, self.plant_number].values
+        Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
@@ -151,7 +148,7 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data_scaled[self.plant_number], dtype=torch.float32)
+        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data_scaled, dtype=torch.float32)
 
 
 class PowerPlantDailyDataset(PowerPlantDataset):
