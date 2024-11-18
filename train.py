@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from paths import path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import model_type_dict
 
@@ -220,4 +221,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     print(f'now training {args.model_type}')
+    path_loader.plant_number = (args.plant_number)
+    if not path_loader.check_exists():
+        print(f"{args.plant_number} does not have source input file")
+        exit(0)
     main(args)

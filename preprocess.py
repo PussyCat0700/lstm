@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-from paths import source_power_file, train_power_file, valid_power_file, test_power_file
+from tqdm import tqdm
+from paths import path_loader
 
 def interpolate_missing_data(df):
     """
@@ -23,7 +24,7 @@ def interpolate_missing_data(df):
     df.fillna(method='ffill', inplace=True)  # Fill remaining NaNs with forward fill
     return df
 
-def save_data(train_file, test_file, split=0.95):
+def save_data(train_file, test_file, train_power_file, valid_power_file, test_power_file, split=0.95):
     """
     Saves training and testing data to CSV files.
     """
@@ -55,7 +56,15 @@ def load_data(train_filename, test_filename):
         "test": testing_set,
     }
 
-def get_data(overwrite=False):
+def get_data(plant_number, overwrite=False):
+    path_loader.plant_number = plant_number
+    train_power_file = path_loader.paths['train_power_file']
+    valid_power_file = path_loader.paths['valid_power_file']
+    test_power_file = path_loader.paths['test_power_file']
+    source_power_file = path_loader.paths['source_power_file']
+    if not os.path.exists(source_power_file):
+        print(f'{source_power_file} does not exist')
+        return None
     if overwrite or not os.path.exists(train_power_file) or not os.path.exists(test_power_file):
         # Load and preprocess data
         data = pd.read_csv(source_power_file)
@@ -66,9 +75,10 @@ def get_data(overwrite=False):
         training_set = data[data['Unnamed: 0'] < split_date]
         testing_set = data[data['Unnamed: 0'] >= split_date]
         # Save the processed data
-        save_data(training_set, testing_set)
+        save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file)
     
     return load_data(train_power_file, test_power_file)
 
 if __name__ == "__main__":
-    get_data(overwrite=True)
+    for i in tqdm(range(0, 436+1)):
+        get_data(i, overwrite=True)

@@ -1,0 +1,12 @@
+plant_number: 436
+paths:
+  source_power_file: "/data1/yfliu/solar_baseline/solar/nmg_data_new/{plant_number}.csv"
+  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/weather_china_all_interp/{plant_number}"
+  train_power_file: "/data1/yfliu/solar_baseline/solar/preprocessed/nmg/{plant_number}/train_china_nmg_solar_history.csv"
+  valid_power_file: "/data1/yfliu/solar_baseline/solar/preprocessed/nmg/{plant_number}/valid_china_nmg_solar_history.csv"
+  test_power_file: "/data1/yfliu/solar_baseline/solar/preprocessed/nmg/{plant_number}/test_china_nmg_solar_history.csv"
+  results_save_path: "/data1/yfliu/solar_baseline/runs_xgboost_temp"
+  nwp_min_file: "/data1/yfliu/solar_baseline/solar/preprocessed/nmg/{plant_number}/nwp_min.npy"
+  nwp_max_file: "/data1/yfliu/solar_baseline/solar/preprocessed/nmg/{plant_number}/nwp_max.npy"
+params:
+  nwp_input_size: 27

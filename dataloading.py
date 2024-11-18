@@ -5,38 +5,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import source_nwp_dir, train_power_file, valid_power_file, test_power_file, nwp_max_file, nwp_min_file, nwp_input_size
-
-
-def get_global_min_max_weather(weather_data_dir):
-    if (not os.path.exists(nwp_max_file)) or (not os.path.join(nwp_min_file)): 
-        print('doing nwp minmax')
-        # 初始化最大值和最小值矩阵
-
-        for file_path in os.listdir(weather_data_dir):
-            # 加载当前.npy文件
-            data = np.load(os.path.join(weather_data_dir, file_path))
-            global_min = global_max = None
-            if global_max is None:
-                global_max = np.full((data.shape[-1]), -np.inf)
-            if global_min is None:
-                global_min = np.full((data.shape[-1]), np.inf)
-            # 计算每个变量的最小值和最大值
-            local_max = np.max(data, axis=0) 
-            local_min = np.min(data, axis=0)
-            
-            # 更新全局最大值和最小值
-            global_max = np.maximum(global_max, local_max)
-            global_min = np.minimum(global_min, local_min)
-
-        # 保存最终结果
-        np.save(nwp_max_file, global_max)
-        np.save(nwp_min_file, global_min)
-    else:
-        print('loading nwp minmax')
-        global_max = np.load(nwp_max_file)
-        global_min = np.load(nwp_min_file)
-    return global_min, global_max
+from paths import path_loader
 
 
 class PowerPlantDataset(Dataset):
@@ -49,14 +18,17 @@ class PowerPlantDataset(Dataset):
             power_minmax ([float, float]) Power min and power max for the given station only.
             If None, will be determined with current file.
         """
+        path_loader.plant_number = plant_number
         if split == "train":
-            csv_file = train_power_file
+            csv_file = path_loader.paths['train_power_file']
         elif split == "valid":
-            csv_file = valid_power_file
+            csv_file = path_loader.paths['valid_power_file']
         elif split == "test":
-            csv_file = test_power_file
+            csv_file = path_loader.paths['test_power_file']
         self.data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
-        self.nwp_dir = source_nwp_dir
+        self.nwp_dir = path_loader.paths['source_nwp_dir']
+        self.nwp_max_file = path_loader.paths['nwp_max_file']
+        self.nwp_min_file = path_loader.paths['nwp_min_file']
         self.plant_number = plant_number
         if power_minmax is None:
             self.power_minmax = [
@@ -93,16 +65,47 @@ class PowerPlantDataset(Dataset):
         ])
         valid_times = [t for t in fixed_times if t <= nwp_time]
         closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H_%M_%S')}_{self.plant_number}.npy")
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{self.plant_number}.npy")
         nwp_data = np.load(nwp_file)
         hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
         nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
         return nwp_data_trunc
     
+    def _get_global_min_max_weather(self):
+        weather_data_dir = self.nwp_dir
+        if (not os.path.exists(self.nwp_max_file)) or (not os.path.join(self.nwp_min_file)): 
+            print('doing nwp minmax')
+            # 初始化最大值和最小值矩阵
+
+            for file_path in os.listdir(weather_data_dir):
+                # 加载当前.npy文件
+                data = np.load(os.path.join(weather_data_dir, file_path))
+                global_min = global_max = None
+                if global_max is None:
+                    global_max = np.full((data.shape[-1]), -np.inf)
+                if global_min is None:
+                    global_min = np.full((data.shape[-1]), np.inf)
+                # 计算每个变量的最小值和最大值
+                local_max = np.max(data, axis=0) 
+                local_min = np.min(data, axis=0)
+                
+                # 更新全局最大值和最小值
+                global_max = np.maximum(global_max, local_max)
+                global_min = np.minimum(global_min, local_min)
+
+            # 保存最终结果
+            np.save(self.nwp_max_file, global_max)
+            np.save(self.nwp_min_file, global_min)
+        else:
+            print('loading nwp minmax')
+            global_max = np.load(self.nwp_max_file)
+            global_min = np.load(self.nwp_min_file)
+        return global_min, global_max
+    
     # Function to fit the MinMaxScaler on the weather data
     def init_weather_minmax(self):
         # 提取该场站的最大值和最小值
-        global_min, global_max = get_global_min_max_weather(source_nwp_dir)
+        global_min, global_max = self._get_global_min_max_weather()
         self.station_nwp_max = global_max  # (nwp_input_size,)
         self.station_nwp_min = global_min  # (nwp_input_size,)
 
@@ -259,7 +262,7 @@ def load_csv_data(X_file, Y_file, nwp_file):
     # 加载并转换为numpy数组
     X = np.loadtxt(X_file, delimiter=',')
     Y = np.loadtxt(Y_file, delimiter=',')
-    nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, nwp_input_size)  # 恢复原来的形状
+    nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, path_loader.nwp_input_size)  # 恢复原来的形状
 
     return X, Y, nwp
 
