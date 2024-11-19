@@ -32,6 +32,8 @@ def save_data(train_file, test_file, train_power_file, valid_power_file, test_po
     split_idx = int(len(train_file) * split)
     valid_df = train_file.iloc[split_idx:]
     train_df = train_file.iloc[:split_idx]
+    split_date = train_df['Unnamed: 0'].min() + pd.DateOffset(months=3)
+    train_df = train_df[train_df['Unnamed: 0'] < split_date]
     test_df = test_file
     train_df.to_csv(train_power_file, index=False)
     valid_df.to_csv(valid_power_file, index=False)
