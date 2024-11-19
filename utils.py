@@ -1,8 +1,8 @@
 import csv
 import numpy as np
-from constants import FFNN, GPNN, LSTM
+from constants import CNN_LSTM, FFNN, GPNN, LSTM
 from dataloading import get_data_loaders_and_denormalizer
-from lstm_model import BiLSTMNWPOnly
+from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
 from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
 
@@ -19,6 +19,11 @@ def get_model_and_loader(args, device):
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
         # Initialize model, criterion, and optimizer
         model = BiLSTMNWPOnly().to(device)
+    elif args.model_type == CNN_LSTM:
+        # Get data loaders
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        # Initialize model, criterion, and optimizer
+        model = CNNLSTMModel().to(device)
     elif args.model_type == FFNN:
         # Get data loaders
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)

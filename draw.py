@@ -5,7 +5,6 @@ import torch
 import matplotlib.pyplot as plt
 from dataloading import get_latest_checkpoint, load_checkpoint
 from utils import get_model_and_loader
-from lstm_model import BiLSTMNWPOnly
 from constants import model_type_dict
 import torch
 import matplotlib.pyplot as plt
