@@ -47,8 +47,8 @@ def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=
     mse = np.mean(np.abs(all_preds - all_gts) ** 2)
     # Plot the results
     plt.figure()
-    plt.plot(all_gts[:96*days], label='Ground Truth', color='blue')
-    plt.plot(all_preds[:96*days], label='Prediction', color='red')
+    plt.plot(all_gts[:96], label='Ground Truth', color='blue')
+    plt.plot(all_preds[:96], label='Prediction', color='red')
     plt.xlabel('Time Step')
     plt.ylabel('Power (MW)')
     plt.title('Predicted vs Ground Truth Power Output')

@@ -277,7 +277,7 @@ def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:
     valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax, with_extra_span=False)
     test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax, with_extra_span=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, shuffle=True)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
