@@ -82,5 +82,5 @@ def get_data(plant_number, overwrite=False):
     return load_data(train_power_file, test_power_file)
 
 if __name__ == "__main__":
-    for i in tqdm(range(0, 436+1)):
+    for i in tqdm(range(0, 481+1)):
         get_data(i, overwrite=True)
