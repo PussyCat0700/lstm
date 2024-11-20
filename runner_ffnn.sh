@@ -13,7 +13,7 @@
 #SBATCH --mail-type=all
 #SBATCH --mail-user=1729372667@qq.com
 
-for i in {0..328}
+for i in {0..481}
 do
     # 替换 %d 为当前的数字 i
     ckpt_dir="/data1/yfliu/solar_baseline/runs_ffnn/ffnn_$i"
