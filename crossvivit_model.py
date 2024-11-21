@@ -12,28 +12,49 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 
+class Cyclical_embedding(nn.Module):
+    def __init__(self, frequencies=[12, 31, 24, 60]):
+        super().__init__()
+        self.frequencies = frequencies
+        self.dim = len(self.frequencies) * 2
+
+    def forward(self, time_coords: torch.Tensor):
+        """
+        Args:
+            time_coords (torch.Tensor): Time coordinates of shape [B, T, C, H, W]
+        """
+        embeddings = []
+        for i, frequency in enumerate(self.frequencies):
+            embeddings += [
+                torch.sin(2 * torch.pi * time_coords[:, :, i] / frequency),
+                torch.cos(2 * torch.pi * time_coords[:, :, i] / frequency),
+            ]
+        embeddings = torch.stack(embeddings, axis=2)
+        return embeddings
+
+
 class RoCrossViViT(nn.Module):
     def __init__(
         self,
-        image_size: Union[List[int], Tuple[int]],
-        patch_size: Union[List[int], Tuple[int]],
-        time_coords_encoder: nn.Module,
-        dim: int = 128,
-        depth: int = 4,
-        heads: int = 4,
+        image_size = [64, 64],
+        patch_size = [8, 8],
+        time_coords_encoder: nn.Module = Cyclical_embedding(),
+        dim: int = 384,
+        depth: int = 16,
+        heads: int = 12,
         mlp_ratio: int = 4,
-        ctx_channels: int = 3,
-        ts_channels: int = 3,
+        ctx_channels: int = 18,
+        ts_channels: int = 8,
         ts_length: int = 48,
         out_dim: int = 1,
         dim_head: int = 64,
-        dropout: float = 0.0,
+        dropout: float = 0.4,
         freq_type: str = "lucidrains",
         pe_type: str = "rope",
         num_mlp_heads: int = 1,
         use_glu: bool = True,
-        ctx_masking_ratio: float = 0.9,
-        ts_masking_ratio: float = 0.9,
+        ctx_masking_ratio: float = 0.99,
+        ts_masking_ratio: float = 0,
         decoder_dim: int = 128,
         decoder_depth: int = 4,
         decoder_heads: int = 6,
