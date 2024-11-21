@@ -9,8 +9,6 @@
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
 #SBATCH --output=./logs/station_logs/cnnlstm_%A_%a.out
 #SBATCH --error=./logs/station_logs/cnnlstm_%A_%a.err
-#SBATCH --mail-type=all     # 设置邮件通知类型，可选all, end, fail, begin
-#SBATCH --mail-user=1729372667@qq.com # 设置通知邮箱
 #SBATCH --time=7-00:00:00
 
 # 获取当前任务ID
@@ -25,6 +23,7 @@ do
     plant_number=$((task_id + i))
     echo "Running task for plant_number: $plant_number"
     ckpt_dir=/data1/yfliu/solar_baseline/runs_cnnlstm/lstm_$plant_number
+    mkdir -p $ckpt_dir
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py 3 --plant_number $plant_number --checkpoint_dir $ckpt_dir --batch_size 1024 --num_epochs 1000 > "$ckpt_dir/log.txt" 2>&1 &
 done
 wait
