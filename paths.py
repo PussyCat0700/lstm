@@ -13,6 +13,7 @@ class LazyPathLoader:
     def __init__(self):
         self.plant_number = None
         self._paths = None
+        self.ablation_name = None
         self._load_cfg()
     
     @property
@@ -31,13 +32,32 @@ class LazyPathLoader:
             self.config = yaml.safe_load(file)
     
     def _update_paths(self, paths):
-        return {key: value.format(plant_number=plantnumdict[self.plant_number]) for key, value in paths.items()}
+        plant_id = plantnumdict[self.plant_number]
+        paths = {key: value.format(plant_number=plant_id) for key, value in paths.items()}
+        processed_dir = paths["processed_dir"]
+        rel_dir = f"china/{plant_id}"
+        if self.ablation_name is not None:
+            rel_dir = f"ablation_china/{self.ablation_name}/{plant_id}"
+        paths["train_power_file"] = os.path.join(processed_dir, f"{rel_dir}/train_china_china_solar_history.csv")
+        paths["valid_power_file"] = os.path.join(processed_dir, f"{rel_dir}/valid_china_china_solar_history.csv")
+        paths["test_power_file"] = os.path.join(processed_dir, f"{rel_dir}/test_china_china_solar_history.csv")
+        paths["nwp_min_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_min.npy")
+        paths["nwp_max_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_max.npy")
+        return paths
     
     def _create_directories(self, paths):
         # 使用 os.makedirs 确保每个路径的目录存在
         for path in paths.values():
             dir_path = os.path.dirname(path)
             os.makedirs(dir_path, exist_ok=True)
+
+    def get_run_path(self, modelname):
+        midname = f"runs_{modelname}"
+        if self.ablation_name is not None:
+            midname = f"ablation_{modelname}/{self.ablation_name}"
+        runpath = f"{self.paths['results_save_path']}/{midname}/{modelname}_{plantnumdict[self.plant_number]}"
+        os.makedirs(runpath, exist_ok=True)
+        return runpath
 
     @property
     def nwp_input_size(self):

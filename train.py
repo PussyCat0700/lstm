@@ -217,12 +217,17 @@ if __name__ == "__main__":
     parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
     parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
-    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")
+    parser.add_argument("--months", help="months used in training set.")
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     print(f'now training {args.model_type}')
-    path_loader.plant_number = (args.plant_number)
+    if args.months != '12m':
+        path_loader.ablation_name = args.months
+    path_loader.plant_number = args.plant_number
+    args.checkpoint_dir = path_loader.get_run_path(args.model_type)
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
         exit(0)
+    else:
+        print(f"training in {args.checkpoint_dir}")
     main(args)
