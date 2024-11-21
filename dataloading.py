@@ -5,7 +5,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import path_loader
+from paths import path_loader, plantnumdict
 
 
 class PowerPlantDataset(Dataset):
@@ -65,7 +65,7 @@ class PowerPlantDataset(Dataset):
         ])
         valid_times = [t for t in fixed_times if t <= nwp_time]
         closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{self.plant_number}.npy")
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{plantnumdict[self.plant_number]}.npy")
         nwp_data = np.load(nwp_file)
         hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
         nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]

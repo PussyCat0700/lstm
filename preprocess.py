@@ -80,5 +80,9 @@ def get_data(plant_number, overwrite=False):
     return load_data(train_power_file, test_power_file)
 
 if __name__ == "__main__":
-    for i in tqdm(range(0, 481+1)):
-        get_data(i, overwrite=True)
+    df = pd.read_csv("/data1/yfliu/solar_baseline/solar/china_data/china_info.csv")
+    pbar = tqdm(range(len(df)))
+    for idx, row in df.iterrows():
+        plant_no = row["PLANT_NO"]
+        get_data(plant_no, overwrite=True)
+        pbar.update()

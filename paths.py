@@ -1,6 +1,13 @@
 # Read only
 import os
 import yaml
+import pandas as pd
+
+plantnumdict = {}
+df = pd.read_csv("/data1/yfliu/solar_baseline/solar/china_data/china_info.csv")
+for idx, row in df.iterrows():
+    plant_no = row["PLANT_NO"]
+    plantnumdict[idx] = plant_no
 
 class LazyPathLoader:
     def __init__(self):
@@ -20,11 +27,11 @@ class LazyPathLoader:
     
     def _load_cfg(self):
         # 读取 YAML 配置文件
-        with open('./conf/solar/nmg.yaml', 'r') as file:
+        with open('./conf/solar/china.yaml', 'r') as file:
             self.config = yaml.safe_load(file)
     
     def _update_paths(self, paths):
-        return {key: value.format(plant_number=self.plant_number) for key, value in paths.items()}
+        return {key: value.format(plant_number=plantnumdict[self.plant_number]) for key, value in paths.items()}
     
     def _create_directories(self, paths):
         # 使用 os.makedirs 确保每个路径的目录存在
