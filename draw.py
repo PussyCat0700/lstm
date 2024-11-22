@@ -29,23 +29,9 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     # Convert lists to numpy arrays
     all_preds = np.array(all_preds).flatten()
     all_gts = np.array(all_gts).flatten()
-    mae = np.mean(np.abs(all_preds - all_gts))
-    mse = np.mean(np.abs(all_preds - all_gts) ** 2)
-    # Plot the results
-    plt.figure()
-    plt.plot(all_gts[:96*days], label='Ground Truth', color='blue')
-    plt.plot(all_preds[:96*days], label='Prediction', color='red')
-    plt.xlabel('Time Step')
-    plt.ylabel('Power (MW)')
-    plt.title('Predicted vs Ground Truth Power Output')
-    plt.legend()
-    plt.savefig(filename)
-    dir_name = os.path.dirname(filename)
-    np.save(os.path.join(dir_name, 'all_preds.npy'), all_preds)
-    np.save(os.path.join(dir_name, 'all_gts.npy'), all_gts)
-    return mae, mse
+    plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days)
 
-def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10):
+def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days):
     mae = np.mean(np.abs(all_preds - all_gts))
     mse = np.mean(np.abs(all_preds - all_gts) ** 2)
     # Plot the results

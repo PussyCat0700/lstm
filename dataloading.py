@@ -174,19 +174,22 @@ class PowerPlantHourlyDataset(PowerPlantDataset):
 
 
 class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
-    """点对点的数据集，只需要整点的数据
+    """小时对小时的数据集
     当前整点数据对应40小时后的整点数据
     """
+    def __len__(self):
+        return len(self.data) // 4 - (8+16+24)  # Hourly
+    
     def _get_start_time(self, idx):
-        offset = 0  # hh:00:00
+        offset = 4*8  # hh:00:00
         start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
         return start_time
     
     def __getitem__(self, idx):
         """
         1. csv不需要倒时差
-        - 当前时间day0 08:00:00
-        - 预测目标day2 00:00:00
+        - 当前时间day0 08:00:00-08:45:00
+        - 预测目标day2 00:00:00-00:45:00
         评估：
         2. nwp的时差
         08:00:00->00:00:00 -8h
@@ -197,17 +200,19 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         nwp_data_scaled: shaped (nwp_input_size,)
         """
         # Current day data
-        x_time = self._get_start_time(idx)  # start
-        X = self.data.loc[x_time].iloc[0]
+        x_start_time = self._get_start_time(idx)  # start
+        x_end_time = x_start_time + pd.DateOffset(minutes=45)
+        X = self.data.loc[x_start_time:x_end_time].iloc[:, 0].values
         X_norm = self.normalize_power_data(X)
         
         # Next day data
-        y_time = x_time + pd.DateOffset(hours=40)
-        Y = self.data.loc[y_time].iloc[0]
+        y_start_time = x_start_time + pd.DateOffset(hours=40)
+        y_end_time = y_start_time + pd.DateOffset(minutes=45)
+        Y = self.data.loc[y_start_time:y_end_time].iloc[:, 0].values
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = y_time - pd.DateOffset(hours=8)
+        nwp_time = x_end_time - pd.DateOffset(hours=8)
         nwp_data = self._get_nwp(nwp_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
@@ -249,8 +254,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
         for i in pbar:
             X_norm, Y_norm, nwp_data_scaled = dataset[i]
             # 将每个样本写入csv文件
-            writer_X.writerow([X_norm,])        # 保存 X_norm
-            writer_Y.writerow([Y_norm,])        # 保存 Y_norm
+            writer_X.writerow(X_norm.tolist())        # 保存 X_norm
+            writer_Y.writerow(Y_norm.tolist())        # 保存 Y_norm
             writer_nwp.writerow(nwp_data_scaled.tolist())  # 保存nwp_data_scaled展平为一行
 
     # 加载并返回CSV中的数据
@@ -306,4 +311,5 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
+    path_loader.init('12m', 'nmg', 0)
     get_dataset_and_denormalizer_sklearn(0, "valid", "here")

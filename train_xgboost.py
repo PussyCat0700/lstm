@@ -17,14 +17,13 @@ parser.add_argument("plant_set", choices=PLANTS.keys())
 args = parser.parse_args()
 path_loader.init(args.months, args.plant_set, args.plant_number)
 save_path, is_done = path_loader.get_run_path_status(XGBOOST)
+print(f"ckpt: {save_path}")
 if not path_loader.check_exists():
     print(f"{args.plant_number} does not have source input file")
     exit(0)
 if is_done:
     print(f"{args.plant_number} already has output metrics.csv at {save_path}")
     exit(0)
-else:
-    print(f"training in {save_path}")
 model = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3,
                            learning_rate=0.1, max_depth=5, alpha=10, n_estimators=100)
 _, Y_train, X_nwp_train, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path)
@@ -39,6 +38,8 @@ try:
     preds_test = model.predict(X_nwp_test)
     preds_test = denormalizer(preds_test)
     Y_test = denormalizer(Y_test)
+    preds_test = preds_test.flatten()
+    Y_test = Y_test.flatten()
     all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
     print(all_metrics)
     metrics_path = os.path.join(save_path, 'metrics.csv')
