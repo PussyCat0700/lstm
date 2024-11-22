@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from paths import path_loader
+from paths import PLANTS, path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import model_type_dict
 
@@ -218,12 +218,11 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--months", help="months used in training set.")
+    parser.add_argument("--plant_set", choices=PLANTS.keys())
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     print(f'now training {args.model_type}')
-    if args.months != '12m':
-        path_loader.ablation_name = args.months
-    path_loader.plant_number = args.plant_number
+    path_loader.init(args.months, args.plant_set, args.plant_number)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")

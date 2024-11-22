@@ -3,44 +3,54 @@ import os
 import yaml
 import pandas as pd
 
-plantnumdict = {}
-df = pd.read_csv("/data1/yfliu/solar_baseline/solar/china_data/china_info.csv")
-for idx, row in df.iterrows():
-    plant_no = row["PLANT_NO"]
-    plantnumdict[idx] = plant_no
+PLANTS = {
+    "china": './conf/solar/china.yaml',
+    "nmg": './conf/solar/nmg.yaml',
+}
 
 class LazyPathLoader:
     def __init__(self):
         self.plant_number = None
-        self._paths = None
-        self.ablation_name = None
-        self._load_cfg()
+        self.plantnumdict = {}
     
-    @property
-    def paths(self):
-        self._load_cfg()
-        self._paths = self._update_paths(self.config['paths'])
-        self._create_directories(self._paths)
-        return self._paths
+    def init(self, months, plantset, plant_number):
+        self.plant_number = plant_number
+        self.plantset = plantset
+        cfg_filename = PLANTS[self.plantset]
+        self._load_cfg(cfg_filename)
+        self.ablation_name = None
+        if months != '12m':
+            self.ablation_name = months
+        # init paths
+        df = pd.read_csv(self.config['paths']['source_power_stat'])
+        for idx, row in df.iterrows():
+            plant_no = row["PLANT_NO"]
+            self.plantnumdict[idx] = int(plant_no)
+        self.plant_id = self.plantnumdict[self.plant_number]
+        self.paths = self._prep_paths()
+    
+    def _prep_paths(self):
+        _paths = self._update_paths(self.config['paths'])
+        self._create_directories(_paths)
+        return _paths
     
     def check_exists(self):
         return os.path.exists(self.paths['source_power_file'])
     
-    def _load_cfg(self):
+    def _load_cfg(self, filename):
         # 读取 YAML 配置文件
-        with open('./conf/solar/china.yaml', 'r') as file:
+        with open(filename, 'r') as file:
             self.config = yaml.safe_load(file)
     
     def _update_paths(self, paths):
-        plant_id = plantnumdict[self.plant_number]
-        paths = {key: value.format(plant_number=plant_id) for key, value in paths.items()}
+        paths = {key: value.format(plant_number=self.plant_id) for key, value in paths.items()}
         processed_dir = paths["processed_dir"]
-        rel_dir = f"china/{plant_id}"
+        rel_dir = f"{self.plantset}/{self.plant_id}"
         if self.ablation_name is not None:
-            rel_dir = f"ablation_china/{self.ablation_name}/{plant_id}"
-        paths["train_power_file"] = os.path.join(processed_dir, f"{rel_dir}/train_china_china_solar_history.csv")
-        paths["valid_power_file"] = os.path.join(processed_dir, f"{rel_dir}/valid_china_china_solar_history.csv")
-        paths["test_power_file"] = os.path.join(processed_dir, f"{rel_dir}/test_china_china_solar_history.csv")
+            rel_dir = f"ablation_{self.plantset}/{self.ablation_name}/{self.plant_id}"
+        paths["train_power_file"] = os.path.join(processed_dir, f"{rel_dir}/train_china_{self.plantset}_solar_history.csv")
+        paths["valid_power_file"] = os.path.join(processed_dir, f"{rel_dir}/valid_china_{self.plantset}_solar_history.csv")
+        paths["test_power_file"] = os.path.join(processed_dir, f"{rel_dir}/test_china_{self.plantset}_solar_history.csv")
         paths["nwp_min_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_min.npy")
         paths["nwp_max_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_max.npy")
         return paths
@@ -59,7 +69,7 @@ class LazyPathLoader:
         midname = f"runs_{modelname}"
         if self.ablation_name is not None:
             midname = f"ablation_{modelname}/{self.ablation_name}"
-        runpath = f"{self.paths['results_save_path']}/{midname}/{modelname}_{plantnumdict[self.plant_number]}"
+        runpath = f"{self.paths['results_save_path']}/{midname}/{modelname}_{self.plant_id}"
         os.makedirs(runpath, exist_ok=True)
         metric_dir = os.path.join(runpath, 'metrics.csv')
         return runpath, os.path.exists(metric_dir)
@@ -73,7 +83,7 @@ class LazyPathLoader:
 # 创建懒加载路径加载器
 path_loader = LazyPathLoader()
 # 不受影响的变量
-nwp_input_size = path_loader.nwp_input_size
+nwp_input_size = 27
 
 class BaseSavePath:
     def __str__(self) -> str:
