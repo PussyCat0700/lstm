@@ -98,13 +98,6 @@ class BaseSavePath:
     def get_metrics_path(self):
         return os.path.join(self.save_path, 'metrics.csv')
 
-class XGBSavePath(BaseSavePath):
-    def __init__(self, plant_number) -> None:
-        XGBOOST_SAVE_PATH = os.path.join(results_save_path, "xgboost")
-        self.save_path = os.path.join(XGBOOST_SAVE_PATH, f'xgboost_{plant_number}')
-        self.plant_number = plant_number
-        os.makedirs(self.save_path, exist_ok=True)
-
 class GPCFSavePath(BaseSavePath):
     def __init__(self, plant_number) -> None:
         GPCF_SAVE_PATH = os.path.join(results_save_path, "gpcf")

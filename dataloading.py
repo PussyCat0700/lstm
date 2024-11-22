@@ -198,12 +198,12 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         """
         # Current day data
         x_time = self._get_start_time(idx)  # start
-        X = self.data.loc[x_time].iloc[self.plant_number]
+        X = self.data.loc[x_time].iloc[0]
         X_norm = self.normalize_power_data(X)
         
         # Next day data
         y_time = x_time + pd.DateOffset(hours=40)
-        Y = self.data.loc[y_time].iloc[self.plant_number]
+        Y = self.data.loc[y_time].iloc[0]
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data

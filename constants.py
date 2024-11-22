@@ -2,6 +2,7 @@ LSTM = "BiLSTM"
 FFNN = "FFNN"
 GPNN = "GPNN"
 CNN_LSTM = "CNN_LSTM"
+XGBOOST = "XGBOOST"
 model_type_dict = {
     0: LSTM,
     1: FFNN,
