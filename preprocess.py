@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from tqdm import tqdm
+import argparse
 from paths import path_loader
 
 def interpolate_missing_data(df):
@@ -24,7 +25,7 @@ def interpolate_missing_data(df):
     df.fillna(method='ffill', inplace=True)  # Fill remaining NaNs with forward fill
     return df
 
-def save_data(train_file, test_file, train_power_file, valid_power_file, test_power_file, split=0.95):
+def save_data(train_file, test_file, train_power_file, valid_power_file, test_power_file, split=0.95, months=12):
     """
     Saves training and testing data to CSV files.
     """
@@ -32,6 +33,8 @@ def save_data(train_file, test_file, train_power_file, valid_power_file, test_po
     split_idx = int(len(train_file) * split)
     valid_df = train_file.iloc[split_idx:]
     train_df = train_file.iloc[:split_idx]
+    split_date = train_df['Unnamed: 0'].min() + pd.DateOffset(months=months)
+    train_df = train_df[train_df['Unnamed: 0'] < split_date]
     test_df = test_file
     train_df.to_csv(train_power_file, index=False)
     valid_df.to_csv(valid_power_file, index=False)
@@ -56,8 +59,8 @@ def load_data(train_filename, test_filename):
         "test": testing_set,
     }
 
-def get_data(plant_number, overwrite=False):
-    path_loader.plant_number = plant_number
+def get_data(plant_number, months, overwrite=False):
+    path_loader.init(f"{args.months}m", "china", plant_number)
     train_power_file = path_loader.paths['train_power_file']
     valid_power_file = path_loader.paths['valid_power_file']
     test_power_file = path_loader.paths['test_power_file']
@@ -75,14 +78,18 @@ def get_data(plant_number, overwrite=False):
         training_set = data[data['Unnamed: 0'] < split_date]
         testing_set = data[data['Unnamed: 0'] >= split_date]
         # Save the processed data
-        save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file)
+        save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file, months=months)
     
     return load_data(train_power_file, test_power_file)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("months", type=int)
+    args = parser.parse_args()
+    path_loader.init(args.months, "china", 0)
     df = pd.read_csv("/data1/yfliu/solar_baseline/solar/china_data/china_info.csv")
     pbar = tqdm(range(len(df)))
     for idx, row in df.iterrows():
-        plant_no = row["PLANT_NO"]
-        get_data(plant_no, overwrite=True)
+        plant_no = idx
+        get_data(plant_no, months=args.months, overwrite=True)
         pbar.update()
