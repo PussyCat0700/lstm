@@ -224,9 +224,12 @@ if __name__ == "__main__":
     if args.months != '12m':
         path_loader.ablation_name = args.months
     path_loader.plant_number = args.plant_number
-    args.checkpoint_dir = path_loader.get_run_path(args.model_type)
+    args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
+        exit(0)
+    if is_done:
+        print(f"{args.plant_number} already has output metrics.csv at {args.checkpoint_dir}")
         exit(0)
     else:
         print(f"training in {args.checkpoint_dir}")

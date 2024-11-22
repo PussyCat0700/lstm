@@ -3,9 +3,10 @@
 #SBATCH --account=yfliu3
 #SBATCH --job-name=cnnlstm
 #SBATCH --partition=RTX3090,RTX4090
-#SBATCH --cpus-per-task=24  # 每个进程的CPU数量
-#SBATCH --array=0-398:10%1       # 任务ID范围
+#SBATCH --cpus-per-task=12  # 每个进程的CPU数量
+#SBATCH --array=0-398:10%2       # 任务ID范围
 #SBATCH --mem=300GB
+#SBATCH --qos=ne_ablation
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
 #SBATCH --output=./logs/station_logs/cnnlstm_%A_%a.out
 #SBATCH --error=./logs/station_logs/cnnlstm_%A_%a.err

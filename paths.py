@@ -51,13 +51,18 @@ class LazyPathLoader:
             dir_path = os.path.dirname(path)
             os.makedirs(dir_path, exist_ok=True)
 
-    def get_run_path(self, modelname):
+    def get_run_path_status(self, modelname):
+        """
+        Returns:
+            runpath, is it over with metrics.csv.
+        """
         midname = f"runs_{modelname}"
         if self.ablation_name is not None:
             midname = f"ablation_{modelname}/{self.ablation_name}"
         runpath = f"{self.paths['results_save_path']}/{midname}/{modelname}_{plantnumdict[self.plant_number]}"
         os.makedirs(runpath, exist_ok=True)
-        return runpath
+        metric_dir = os.path.join(runpath, 'metrics.csv')
+        return runpath, os.path.exists(metric_dir)
 
     @property
     def nwp_input_size(self):

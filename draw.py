@@ -40,6 +40,9 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     plt.title('Predicted vs Ground Truth Power Output')
     plt.legend()
     plt.savefig(filename)
+    dir_name = os.path.dirname(filename)
+    np.save(os.path.join(dir_name, 'all_preds.npy'), all_preds)
+    np.save(os.path.join(dir_name, 'all_gts.npy'), all_gts)
     return mae, mse
 
 def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10):
