@@ -61,92 +61,95 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         print("No checkpoint found, starting from scratch.")
 
     # Training loop
-    for epoch in range(start_epoch, num_epochs):
-        model.train()
-        train_loss = 0.0
-        pbar = tqdm(train_loader)
-        print(f'*****{epoch=}******')
-        for batch_idx, (X, Y, nwp_data) in enumerate(pbar):
-            X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
-            
-            optimizer.zero_grad()
-            outputs = model(nwp_data)
-            loss = criterion(denormalizer(outputs), denormalizer(Y))
-            if torch.isnan(loss):
-                print("NaN detected in training loss. Stopping training.")
-                with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
-                    f.write("NaN detected in training loss at batch index {}.".format(batch_idx))
-                exit()
-            loss.backward()
-            optimizer.step()
-            
-            train_loss += loss.item()
-            pbar.set_description(f"train loss={loss.item()}")
-            if use_wandb:
-                wandb.log({"train_loss": loss.item(), "epoch": epoch})
-            else:
-                writer.add_scalar("Loss/train", loss.item(), epoch * len(train_loader) + batch_idx)
-        
-        train_loss /= len(train_loader)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}")
-        
-        # Validation loop
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
+    if not args.test:
+        for epoch in range(start_epoch, num_epochs):
+            model.train()
+            train_loss = 0.0
+            pbar = tqdm(train_loader)
+            print(f'*****{epoch=}******')
+            for batch_idx, (X, Y, nwp_data) in enumerate(pbar):
                 X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+                
+                optimizer.zero_grad()
                 outputs = model(nwp_data)
                 loss = criterion(denormalizer(outputs), denormalizer(Y))
                 if torch.isnan(loss):
-                    print("NaN detected in validation loss. Stopping training.")
+                    print("NaN detected in training loss. Stopping training.")
                     with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
-                        f.write("NaN detected in validation loss at batch index {}.".format(batch_idx))
+                        f.write("NaN detected in training loss at batch index {}.".format(batch_idx))
                     exit()
-                val_loss += loss.item()
+                loss.backward()
+                optimizer.step()
                 
+                train_loss += loss.item()
+                pbar.set_description(f"train loss={loss.item()}")
                 if use_wandb:
-                    wandb.log({"val_loss": loss.item(), "epoch": epoch})
+                    wandb.log({"train_loss": loss.item(), "epoch": epoch})
                 else:
-                    writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + batch_idx)
-        val_loss /= len(val_loader)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Validation Loss: {val_loss:.4f}")
+                    writer.add_scalar("Loss/train", loss.item(), epoch * len(train_loader) + batch_idx)
+            
+            train_loss /= len(train_loader)
+            print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}")
+            
+            # Validation loop
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
+                    X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+                    outputs = model(nwp_data)
+                    loss = criterion(denormalizer(outputs), denormalizer(Y))
+                    if torch.isnan(loss):
+                        print("NaN detected in validation loss. Stopping training.")
+                        with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
+                            f.write("NaN detected in validation loss at batch index {}.".format(batch_idx))
+                        exit()
+                    val_loss += loss.item()
+                    
+                    if use_wandb:
+                        wandb.log({"val_loss": loss.item(), "epoch": epoch})
+                    else:
+                        writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + batch_idx)
+            val_loss /= len(val_loader)
+            print(f"Epoch [{epoch+1}/{num_epochs}], Validation Loss: {val_loss:.4f}")
+            
+            # Adjust the learning rate based on validation loss
+            scheduler.step(val_loss)
+            
+            # Save checkpoint if this epoch has the best validation loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                print(f'{best_val_loss=}')
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': val_loss,
+                }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+            else:
+                # otherwise you might get very high training loss. Our val set is too small.
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print("Early stopping triggered")
+                    break
+            
+            if use_wandb:
+                wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
         
-        # Adjust the learning rate based on validation loss
-        scheduler.step(val_loss)
-        
-        # Save checkpoint if this epoch has the best validation loss
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            patience_counter = 0
-            print(f'{best_val_loss=}')
+        if skip_model_selection:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': val_loss,
             }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+            best_epoch = epoch
         else:
-            # otherwise you might get very high training loss. Our val set is too small.
-            patience_counter += 1
-            if patience_counter >= patience:
-                print("Early stopping triggered")
-                break
-        
-        if use_wandb:
-            wandb.log({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
-    
-    if skip_model_selection:
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': val_loss,
-        }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
-        best_epoch = epoch
+            latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
+            best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
     else:
-        latest_checkpoint = get_latest_checkpoint(checkpoint_dir)
-        best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
+        best_epoch = start_epoch
 
     print(f'testing on epoch {best_epoch}')
     # Testing loop
@@ -219,18 +222,28 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--months", help="months used in training set.")
     parser.add_argument("--plant_set", choices=PLANTS.keys())
+    parser.add_argument("--test", action='store_true')
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     args.num_epochs = 30
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
+    print(f"ckpt: {args.checkpoint_dir}")
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
         exit(0)
     if is_done:
-        print(f"{args.plant_number} already has output metrics.csv at {args.checkpoint_dir}")
-        exit(0)
+        if args.test:
+            files_to_check = [os.path.join(args.checkpoint_dir, x) for x in ['all_gts.npy', 'all_preds.npy']]
+            if all([os.path.isfile(file) for file in files_to_check]):
+                print("test enabled but files are generated.")
+                exit(0)
+        else:
+            print(f"{args.plant_number} already has output metrics.csv at {args.checkpoint_dir}")
+            exit(0)
     else:
-        print(f"training in {args.checkpoint_dir}")
+        if args.test:
+            print("Not done! No test!")
+            exit(0)
     main(args)
