@@ -178,10 +178,10 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
     当前整点数据对应40小时后的整点数据
     """
     def __len__(self):
-        return len(self.data) // 4 - (8+16+24)  # Hourly
+        return len(self.data) // 4 - ((8+6)+16+24)  # Hourly
     
     def _get_start_time(self, idx):
-        offset = 4*8  # hh:00:00
+        offset = 4*(8+6)  # hh:00:00
         start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
         return start_time
     
