@@ -31,7 +31,7 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     all_gts = np.array(all_gts).flatten()
     plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days)
 
-def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days):
+def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10):
     mae = np.mean(np.abs(all_preds - all_gts))
     mse = np.mean(np.abs(all_preds - all_gts) ** 2)
     # Plot the results
