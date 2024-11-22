@@ -15,7 +15,7 @@ from utils import compute_all_metrics, get_model_and_loader, get_parameter_numbe
 from constants import model_type_dict
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=20):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=3):
     skip_model_selection = False
     # 如果真按1k epochs训练效果会更好，但是8分钟才训完一个站，太慢了。
     # if skip_model_selection:
@@ -221,6 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--plant_set", choices=PLANTS.keys())
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
+    args.num_epochs = 30
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)

@@ -5,7 +5,7 @@
 #SBATCH --partition=RTX3090,RTX4090
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
 #SBATCH --array=0-398:16%2       # 任务ID范围
-#SBATCH --mem=300GB
+#SBATCH --mem=80GB
 #SBATCH --qos=ne_ablation
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
 #SBATCH --output=./logs/station_logs/china/ffnn_%A_%a.out
@@ -25,6 +25,6 @@ do
     echo "Running task for plant_number: $plant_number"
     logdir=/data1/yfliu/logs/solar/china/ffnn/${1}_${task_id}_${plant_number}
     mkdir -p $logdir
-    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 --num_epochs 1000 > "$logdir/log.txt" 2>&1 &
+    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 > "$logdir/log.txt" 2>&1 &
 done
 wait
