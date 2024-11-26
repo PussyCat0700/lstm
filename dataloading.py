@@ -5,7 +5,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, path_loader
 
 
 class PowerPlantDataset(Dataset):
@@ -150,7 +150,13 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        return torch.tensor(X_norm, dtype=torch.float32), torch.tensor(Y_norm, dtype=torch.float32), torch.tensor(nwp_data_scaled, dtype=torch.float32)
+        return {
+            KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
+            KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
+            KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
+            KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
+            KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
+        }
 
 
 class PowerPlantDailyDataset(PowerPlantDataset):
@@ -224,7 +230,13 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
         nwp_data_scaled = nwp_data_scaled[40-1]  # only nwp_input_dim is left
 
-        return X_norm, Y_norm, nwp_data_scaled
+        return {
+            KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
+            KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
+            KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
+            KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
+            KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
+        }
 
 
 import csv
@@ -237,6 +249,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
     # 定义保存的文件路径
     X_file = os.path.join(folder_path, "X_norm.csv")
     Y_file = os.path.join(folder_path, "Y_norm.csv")
+    X_file_real = os.path.join(folder_path, "X_real.csv")
+    Y_file_real = os.path.join(folder_path, "Y_real.csv")
     nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
 
     print(f"Saving dataset to CSV in {folder_path}...")
@@ -244,36 +258,50 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
     # 打开文件，以写入模式逐步保存数据
     with open(X_file, 'w', newline='') as f_X, \
          open(Y_file, 'w', newline='') as f_Y, \
+         open(X_file_real, 'w', newline='') as f_X_real, \
+         open(Y_file_real, 'w', newline='') as f_Y_real, \
          open(nwp_file, 'w', newline='') as f_nwp:
 
         # 创建csv writer对象
         writer_X = csv.writer(f_X)
         writer_Y = csv.writer(f_Y)
+        writer_X_real = csv.writer(f_X_real)
+        writer_Y_real = csv.writer(f_Y_real)
         writer_nwp = csv.writer(f_nwp)
         pbar = tqdm(range(len(dataset)))
         for i in pbar:
-            X_norm, Y_norm, nwp_data_scaled = dataset[i]
+            item = dataset[i]
             # 将每个样本写入csv文件
-            writer_X.writerow(X_norm.tolist())        # 保存 X_norm
-            writer_Y.writerow(Y_norm.tolist())        # 保存 Y_norm
-            writer_nwp.writerow(nwp_data_scaled.tolist())  # 保存nwp_data_scaled展平为一行
+            writer_X.writerow(item[KEY_NORM_X].tolist())        # 保存 X_norm
+            writer_Y.writerow(item[KEY_NORM_Y].tolist())        # 保存 Y_norm
+            writer_X_real.writerow(item[KEY_REAL_X].tolist())        # 保存 X_norm
+            writer_Y_real.writerow(item[KEY_REAL_Y].tolist())        # 保存 Y_norm
+            writer_nwp.writerow(item[KEY_NORM_NWP].tolist())  # 保存nwp_data_scaled展平为一行
 
     # 加载并返回CSV中的数据
-    return load_csv_data(X_file, Y_file, nwp_file)
+    return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
 
 
-def load_csv_data(X_file, Y_file, nwp_file):
+def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
     # 加载并转换为numpy数组
     X = np.loadtxt(X_file, delimiter=',')
     Y = np.loadtxt(Y_file, delimiter=',')
+    X_real = np.loadtxt(X_file_real, delimiter=',')
+    Y_real = np.loadtxt(Y_file_real, delimiter=',')
     nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, path_loader.nwp_input_size)  # 恢复原来的形状
 
-    return X, Y, nwp
+    return {
+        KEY_REAL_X: X_real,
+        KEY_REAL_Y: Y_real,
+        KEY_NORM_X: X,
+        KEY_NORM_Y: Y,
+        KEY_NORM_NWP: nwp,
+    }
 
 def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number)
-    X, Y, nwp = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
-    return X, Y, nwp, dataset.denormalize_power_data
+    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
+    return data, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
     train_dataset = PowerPlantHourlyDataset("train", plant_number, with_extra_span=with_extra_span)

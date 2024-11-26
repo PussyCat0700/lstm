@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from paths import PLANTS, path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, PLANTS, path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import model_type_dict
 
@@ -67,12 +67,13 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             train_loss = 0.0
             pbar = tqdm(train_loader)
             print(f'*****{epoch=}******')
-            for batch_idx, (X, Y, nwp_data) in enumerate(pbar):
-                X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+            for batch_idx, batch in enumerate(pbar):
+                REAL_Y = batch[KEY_REAL_Y].to(device)
+                nwp_data = batch[KEY_NORM_NWP].to(device)
                 
                 optimizer.zero_grad()
                 outputs = model(nwp_data)
-                loss = criterion(denormalizer(outputs), denormalizer(Y))
+                loss = criterion(denormalizer(outputs), REAL_Y)
                 if torch.isnan(loss):
                     print("NaN detected in training loss. Stopping training.")
                     with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -95,10 +96,11 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             model.eval()
             val_loss = 0.0
             with torch.no_grad():
-                for batch_idx, (X, Y, nwp_data) in enumerate(val_loader):
-                    X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+                for batch_idx, batch in enumerate(val_loader):
+                    REAL_Y = batch[KEY_REAL_Y].to(device)
+                    nwp_data = batch[KEY_NORM_NWP].to(device)
                     outputs = model(nwp_data)
-                    loss = criterion(denormalizer(outputs), denormalizer(Y))
+                    loss = criterion(denormalizer(outputs), REAL_Y)
                     if torch.isnan(loss):
                         print("NaN detected in validation loss. Stopping training.")
                         with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -158,13 +160,14 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     all_outputs = []
     all_gts = []
     with torch.no_grad():
-        for batch_idx, (X, Y, nwp_data) in enumerate(test_loader):
-            X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+        for batch_idx, batch in enumerate(val_loader):
+            REAL_Y = batch[KEY_REAL_Y].to(device)
+            nwp_data = batch[KEY_NORM_NWP].to(device)
             outputs = denormalizer(model(nwp_data))
-            gts = denormalizer(Y)
-            loss = criterion(outputs, gts)
+            loss = criterion(outputs, REAL_Y)
+            test_loss += loss
             all_outputs.append(outputs.detach().cpu().numpy())
-            all_gts.append(gts.detach().cpu().numpy())
+            all_gts.append(REAL_Y.detach().cpu().numpy())
             
             if use_wandb:
                 wandb.log({"test_loss": loss.item()})
@@ -186,7 +189,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         else:
             writer.add_scalar(f"{key}/test", metric, len(test_loader))
     test_loss /= len(test_loader)
-    print(f"Test Loss: {test_loss:.4f}")
+    print(f"Test Loss (Batched): {test_loss:.4f}")
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
     mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
     print(mae)

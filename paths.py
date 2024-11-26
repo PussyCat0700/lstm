@@ -7,6 +7,11 @@ PLANTS = {
     "china": './conf/solar/china.yaml',
     "nmg": './conf/solar/nmg.yaml',
 }
+KEY_REAL_X = "real_x"
+KEY_REAL_Y = "real_y"
+KEY_NORM_X = "norm_x"
+KEY_NORM_Y = "norm_y"
+KEY_NORM_NWP = "norm_nwp"
 
 class LazyPathLoader:
     def __init__(self):

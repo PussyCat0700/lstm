@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from dataloading import get_latest_checkpoint, load_checkpoint
+from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_REAL_Y
 from utils import get_model_and_loader
 from constants import model_type_dict
 import torch
@@ -16,20 +17,21 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     all_gts = []
     
     with torch.no_grad():
-        for X, Y, nwp_data in test_loader:
-            X, Y, nwp_data = X.to(device), Y.to(device), nwp_data.to(device)
+        for batch in test_loader:
+            REAL_Y = batch[KEY_REAL_Y].to(device)
+            nwp_data = batch[KEY_NORM_NWP].to(device)
             # Generate predictions
             preds = model(nwp_data)
             # If outputs are normalized, denormalize them (assuming `scaler` was used to normalize)
             preds = denormalizer(preds).cpu().numpy()
-            gt = denormalizer(Y).cpu().numpy()
+            gt = REAL_Y.cpu().numpy()
             all_preds.extend(preds)
             all_gts.extend(gt)
     
     # Convert lists to numpy arrays
     all_preds = np.array(all_preds).flatten()
     all_gts = np.array(all_gts).flatten()
-    plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days)
+    return plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days)
 
 def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10):
     mae = np.mean(np.abs(all_preds - all_gts))

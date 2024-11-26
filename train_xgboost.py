@@ -5,7 +5,7 @@ from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
 from constants import XGBOOST
 from utils import compute_all_metrics, write_csv
-from paths import PLANTS, path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_Y, KEY_REAL_Y, PLANTS, path_loader
 import os
 import traceback
 
@@ -26,21 +26,25 @@ if is_done:
     exit(0)
 model = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3,
                            learning_rate=0.1, max_depth=5, alpha=10, n_estimators=100)
-_, Y_train, X_nwp_train, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path)
+train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path)
+X_nwp_train = train_data[KEY_NORM_NWP]
+Y_train = train_data[KEY_NORM_Y]
 model.fit(X_nwp_train, Y_train)
 model_ckpt = os.path.join(save_path, 'model.ckpt')
 with open(model_ckpt, "wb") as f:
     pickle.dump(model,f)
-_, Y_test, X_nwp_test, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path)
+test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path)
+X_nwp_test = test_data[KEY_NORM_NWP]
+Y_test = test_data[KEY_NORM_Y]
+Y_test_real = test_data[KEY_REAL_Y]
 
 
 try:
     preds_test = model.predict(X_nwp_test)
     preds_test = denormalizer(preds_test)
-    Y_test = denormalizer(Y_test)
     preds_test = preds_test.flatten()
-    Y_test = Y_test.flatten()
-    all_metrics = compute_all_metrics(preds_test, Y_test, denormalizer(1.0))
+    Y_test_real = Y_test_real.flatten()
+    all_metrics = compute_all_metrics(preds_test, Y_test_real, denormalizer(1.0))
     print(all_metrics)
     metrics_path = os.path.join(save_path, 'metrics.csv')
     write_csv(metrics_path, all_metrics)
