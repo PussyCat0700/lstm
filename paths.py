@@ -15,12 +15,14 @@ KEY_NORM_NWP = "norm_nwp"
 
 class LazyPathLoader:
     def __init__(self):
+        # Subject to change considering different type_value.
         self.plant_number = None
         self.plantnumdict = {}
     
-    def init(self, months, plantset, plant_number):
+    def init(self, months, plantset, plant_number, type_value=None):
         self.plant_number = plant_number
         self.plantset = plantset
+        self.type_value = type_value
         cfg_filename = PLANTS[self.plantset]
         self._load_cfg(cfg_filename)
         self.ablation_name = None
@@ -28,11 +30,20 @@ class LazyPathLoader:
             self.ablation_name = months
         # init paths
         df = pd.read_csv(self.config['paths']['source_power_stat'])
+        plant_dict_idx = 0
         for idx, row in df.iterrows():
             plant_no = row["PLANT_NO"]
-            self.plantnumdict[idx] = int(plant_no)
-        self.plant_id = self.plantnumdict[self.plant_number]
-        self.paths = self._prep_paths()
+            plant_type = row.get("TYPE", None)
+            if self.type_value is not None and plant_type != self.type_value:
+                continue
+            self.plantnumdict[plant_dict_idx] = int(plant_no)
+            plant_dict_idx += 1
+        self.plant_id = self.plantnumdict.get(self.plant_number, None)
+        print(f'Specified plant # {self.plant_number}/{len(self.plantnumdict)} is actually {self.plant_id} officially.')
+        if self.plant_number >= len(self.plantnumdict):
+            print(f"Warning: {self.plant_number=} out of range for {len(self.plantnumdict)}.")
+        if self.plant_id is not None:
+            self.paths = self._prep_paths()
     
     def _prep_paths(self):
         _paths = self._update_paths(self.config['paths'])

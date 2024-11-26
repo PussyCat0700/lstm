@@ -226,12 +226,13 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--months", help="months used in training set.")
     parser.add_argument("--plant_set", choices=PLANTS.keys())
+    parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
     parser.add_argument("--test", action='store_true')
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     args.num_epochs = 30
     print(f'now training {args.model_type}')
-    path_loader.init(args.months, args.plant_set, args.plant_number)
+    path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     print(f"ckpt: {args.checkpoint_dir}")
     if not path_loader.check_exists():
