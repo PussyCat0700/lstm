@@ -1,23 +1,24 @@
 import argparse
 import pickle
-import xgboost as xgb
 from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
-from constants import XGBOOST
-from utils import compute_all_metrics, write_csv
+from constants import sklearn_model_type_dict
+from utils import compute_all_metrics, get_sklearn_model, write_csv
 from paths import KEY_NORM_NWP, KEY_NORM_Y, KEY_REAL_Y, PLANTS, path_loader
 import os
 import traceback
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("plant_number", type=int, help="Power plant number to be used for training")
-parser.add_argument("months", help="months used in training set.")
-parser.add_argument("plant_set", choices=PLANTS.keys())
+parser.add_argument("model_type", type=int)
+parser.add_argument("--plant_number", type=int, help="Power plant number to be used for training")
+parser.add_argument("--months", help="months used in training set.")
+parser.add_argument("--plant_set", choices=PLANTS.keys())
 parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
 args = parser.parse_args()
 path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
-save_path, is_done = path_loader.get_run_path_status(XGBOOST)
+modelname = sklearn_model_type_dict[args.model_type]
+save_path, is_done = path_loader.get_run_path_status(modelname)
 print(f"ckpt: {save_path}")
 if not path_loader.check_exists():
     print(f"{args.plant_number} does not have source input file")
@@ -25,8 +26,7 @@ if not path_loader.check_exists():
 if is_done:
     print(f"{args.plant_number} already has output metrics.csv at {save_path}")
     exit(0)
-model = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3,
-                           learning_rate=0.1, max_depth=5, alpha=10, n_estimators=100)
+model = get_sklearn_model(args.model_type)
 train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path)
 X_nwp_train = train_data[KEY_NORM_NWP]
 Y_train = train_data[KEY_NORM_Y]

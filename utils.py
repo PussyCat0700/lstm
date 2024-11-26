@@ -1,9 +1,13 @@
 import csv
 import numpy as np
-from constants import CNN_LSTM, FFNN, GPNN, LSTM
+from constants import CNN_LSTM, FFNN, GDBOOST, GPNN, GREEK, LSTM, XGBOOST, sklearn_model_type_dict
 from dataloading import get_data_loaders_and_denormalizer
 from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
+import xgboost as xgb
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neural_network import MLPRegressor
 from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
 
 
@@ -35,6 +39,17 @@ def get_model_and_loader(args, device):
         # Initialize model, criterion, and optimizer
         model = EnhancedWindPowerNN().to(device)
     return model, train_loader, val_loader, test_loader, denormalizer
+
+
+def get_sklearn_model(model_type_int:int):
+    model_type = sklearn_model_type_dict[model_type_int]
+    if model_type == XGBOOST:
+        model = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3, learning_rate=0.1, max_depth=5, alpha=10, n_estimators=100)
+    elif model_type == GDBOOST:
+        model = MultiOutputRegressor(GradientBoostingRegressor(loss='squared_error', learning_rate=0.1, max_depth=5, alpha=0.1, n_estimators=10, random_state=42))
+    elif model_type == GREEK:
+        model = MultiOutputRegressor(MLPRegressor(hidden_layer_sizes=(100,), max_iter=500, random_state=42))
+    return model
 
 
 def compute_all_metrics(preds, gts, cap):
