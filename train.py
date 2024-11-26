@@ -123,12 +123,13 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
                 best_val_loss = val_loss
                 patience_counter = 0
                 print(f'{best_val_loss=}')
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': val_loss,
-                }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch+1}.pt"))
+                for path in [f"checkpoint_epoch_{epoch+1}.pt", "checkpoint_best.pt"]:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'loss': val_loss,
+                    }, os.path.join(checkpoint_dir, path))
             else:
                 # otherwise you might get very high training loss. Our val set is too small.
                 patience_counter += 1

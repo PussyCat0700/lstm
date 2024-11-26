@@ -320,12 +320,17 @@ def save_checkpoint(state, filename):
     torch.save(state, filename)
 
 
-def get_latest_checkpoint(checkpoint_dir):
+def get_latest_checkpoint(checkpoint_dir, load_best=True):
     checkpoints = [f for f in os.listdir(checkpoint_dir) if f.endswith(".pt")]
     if not checkpoints:
         return None
-    checkpoints.sort(key=lambda f: int(f.split('_')[-1].split('.')[0]), reverse=True)
-    return os.path.join(checkpoint_dir, checkpoints[0])
+    best_ckpt = os.path.join(checkpoint_dir, 'checkpoint_best.pt')
+    load_best = load_best and os.path.isfile(best_ckpt)
+    if load_best:
+        return best_ckpt
+    else:
+        checkpoints.sort(key=lambda f: int(f.split('_')[-1].split('.')[0]), reverse=True)
+        return os.path.join(checkpoint_dir, checkpoints[0])
 
 
 def load_checkpoint(checkpoint_path, model, optimizer=None):
