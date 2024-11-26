@@ -5,7 +5,21 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_PE, path_loader
+
+
+def get_time_pe(start_time:pd.Timestamp, hours):
+    # see CrossViVit/tscontext_dataset/TSContextDataset for details.
+    # We are just borrowing their code here.
+    H, W = 1, 1
+    time_utc = pd.date_range(start=start_time.strftime('%Y-%m-%d %H:%M:%S'), periods=hours, freq="H", tz="UTC")
+    months = torch.from_numpy(time_utc.month.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
+    days = torch.from_numpy(time_utc.day.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
+    hours = torch.from_numpy(time_utc.hour.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
+    minutes = torch.from_numpy(time_utc.minute.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
+
+    time_coords = torch.cat([months, days, hours, minutes], dim=1)  # [T, 4, 1, 1]
+    return time_coords
 
 
 class PowerPlantDataset(Dataset):
@@ -150,12 +164,14 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
+        time_pe = get_time_pe(nwp_time, 48)
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
             KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
             KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
             KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
+            KEY_TIME_PE: time_pe,
         }
 
 
@@ -346,3 +362,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 if __name__ == '__main__':
     path_loader.init('12m', 'nmg', 0)
     get_dataset_and_denormalizer_sklearn(0, "valid", "here")
+    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(0, 1)
+    for batch in val_loader:
+        print(batch)

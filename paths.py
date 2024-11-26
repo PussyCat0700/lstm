@@ -12,6 +12,7 @@ KEY_REAL_Y = "real_y"
 KEY_NORM_X = "norm_x"
 KEY_NORM_Y = "norm_y"
 KEY_NORM_NWP = "norm_nwp"
+KEY_TIME_PE = "time_coordinates"
 
 class LazyPathLoader:
     def __init__(self):

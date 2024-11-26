@@ -1,6 +1,6 @@
 import csv
 import numpy as np
-from constants import CNN_LSTM, FFNN, GDBOOST, GPNN, GREEK, LSTM, XGBOOST, sklearn_model_type_dict
+from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, LSTM, XGBOOST, sklearn_model_type_dict
 from dataloading import get_data_loaders_and_denormalizer
 from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
@@ -8,6 +8,7 @@ import xgboost as xgb
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.neural_network import MLPRegressor
+from crossvivit_model import RoCrossViViT
 from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
 
 
@@ -38,6 +39,9 @@ def get_model_and_loader(args, device):
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
         # Initialize model, criterion, and optimizer
         model = EnhancedWindPowerNN().to(device)
+    elif args.model_type == CROSS_VIVIT:
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        model = RoCrossViViT().to(device)
     return model, train_loader, val_loader, test_loader, denormalizer
 
 

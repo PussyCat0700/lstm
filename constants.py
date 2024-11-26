@@ -2,6 +2,7 @@ LSTM = "BiLSTM"
 FFNN = "FFNN"
 GPNN = "GPNN"
 CNN_LSTM = "CNN_LSTM"
+CROSS_VIVIT = "CROSS_VIVIT"
 XGBOOST = "XGBOOST"
 GPCF = "GPCF"
 GDBOOST = "GradientBoost"
@@ -11,6 +12,7 @@ model_type_dict = {
     1: FFNN,
     2: GPNN,
     3: CNN_LSTM,
+    4: CROSS_VIVIT,
 }
 sklearn_model_type_dict = {
     0: XGBOOST,

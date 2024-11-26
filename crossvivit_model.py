@@ -12,12 +12,33 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 
+class Cyclical_embedding(nn.Module):
+    def __init__(self, frequencies: list):
+        super().__init__()
+        self.frequencies = frequencies
+        self.dim = len(self.frequencies) * 2
+
+    def forward(self, time_coords: torch.Tensor):
+        """
+        Args:
+            time_coords (torch.Tensor): Time coordinates of shape [B, T, C, H, W]
+        """
+        embeddings = []
+        for i, frequency in enumerate(self.frequencies):
+            embeddings += [
+                torch.sin(2 * torch.pi * time_coords[:, :, i] / frequency),
+                torch.cos(2 * torch.pi * time_coords[:, :, i] / frequency),
+            ]
+        embeddings = torch.stack(embeddings, axis=2)
+        return embeddings
+
+
 class RoCrossViViT(nn.Module):
     def __init__(
         self,
-        image_size: Union[List[int], Tuple[int]],
-        patch_size: Union[List[int], Tuple[int]],
-        time_coords_encoder: nn.Module,
+        image_size = [64, 64],
+        patch_size = [8, 8],
+        time_coords_encoder: nn.Module = Cyclical_embedding(),
         dim: int = 128,
         depth: int = 4,
         heads: int = 4,
