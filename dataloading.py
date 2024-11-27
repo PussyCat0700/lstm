@@ -252,34 +252,35 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
     X_file_real = os.path.join(folder_path, "X_real.csv")
     Y_file_real = os.path.join(folder_path, "Y_real.csv")
     nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
+    try:
+        return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
+    except Exception as e:
+        print(f"Saving dataset to CSV in {folder_path}...")
 
-    print(f"Saving dataset to CSV in {folder_path}...")
+        # 打开文件，以写入模式逐步保存数据
+        with open(X_file, 'w', newline='') as f_X, \
+            open(Y_file, 'w', newline='') as f_Y, \
+            open(X_file_real, 'w', newline='') as f_X_real, \
+            open(Y_file_real, 'w', newline='') as f_Y_real, \
+            open(nwp_file, 'w', newline='') as f_nwp:
 
-    # 打开文件，以写入模式逐步保存数据
-    with open(X_file, 'w', newline='') as f_X, \
-         open(Y_file, 'w', newline='') as f_Y, \
-         open(X_file_real, 'w', newline='') as f_X_real, \
-         open(Y_file_real, 'w', newline='') as f_Y_real, \
-         open(nwp_file, 'w', newline='') as f_nwp:
-
-        # 创建csv writer对象
-        writer_X = csv.writer(f_X)
-        writer_Y = csv.writer(f_Y)
-        writer_X_real = csv.writer(f_X_real)
-        writer_Y_real = csv.writer(f_Y_real)
-        writer_nwp = csv.writer(f_nwp)
-        pbar = tqdm(range(len(dataset)))
-        for i in pbar:
-            item = dataset[i]
-            # 将每个样本写入csv文件
-            writer_X.writerow(item[KEY_NORM_X].tolist())        # 保存 X_norm
-            writer_Y.writerow(item[KEY_NORM_Y].tolist())        # 保存 Y_norm
-            writer_X_real.writerow(item[KEY_REAL_X].tolist())        # 保存 X_norm
-            writer_Y_real.writerow(item[KEY_REAL_Y].tolist())        # 保存 Y_norm
-            writer_nwp.writerow(item[KEY_NORM_NWP].tolist())  # 保存nwp_data_scaled展平为一行
-
-    # 加载并返回CSV中的数据
-    return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
+            # 创建csv writer对象
+            writer_X = csv.writer(f_X)
+            writer_Y = csv.writer(f_Y)
+            writer_X_real = csv.writer(f_X_real)
+            writer_Y_real = csv.writer(f_Y_real)
+            writer_nwp = csv.writer(f_nwp)
+            pbar = tqdm(range(len(dataset)))
+            for i in pbar:
+                item = dataset[i]
+                # 将每个样本写入csv文件
+                writer_X.writerow(item[KEY_NORM_X].tolist())        # 保存 X_norm
+                writer_Y.writerow(item[KEY_NORM_Y].tolist())        # 保存 Y_norm
+                writer_X_real.writerow(item[KEY_REAL_X].tolist())        # 保存 X_norm
+                writer_Y_real.writerow(item[KEY_REAL_Y].tolist())        # 保存 Y_norm
+                writer_nwp.writerow(item[KEY_NORM_NWP].tolist())  # 保存nwp_data_scaled展平为一行
+    finally:
+        return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
 
 
 def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
