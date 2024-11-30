@@ -36,7 +36,6 @@ with open(model_ckpt, "wb") as f:
     pickle.dump(model,f)
 test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path)
 X_nwp_test = test_data[KEY_NORM_NWP]
-Y_test = test_data[KEY_NORM_Y]
 Y_test_real = test_data[KEY_REAL_Y]
 
 
@@ -50,7 +49,7 @@ try:
     metrics_path = os.path.join(save_path, 'metrics.csv')
     write_csv(metrics_path, all_metrics)
     png_path = os.path.join(save_path, f"{args.plant_number}.png")
-    plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test, png_path, days=10)
+    plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10)
 except ValueError as e:
     # 检查是否为NaN相关的ValueError
     if "Input contains NaN" in str(e):

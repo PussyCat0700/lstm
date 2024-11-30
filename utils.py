@@ -6,8 +6,7 @@ from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
 import xgboost as xgb
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import GradientBoostingRegressor, ExtraTreesRegressor
 from crossvivit_model import RoCrossViViT
 from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
 
@@ -52,7 +51,7 @@ def get_sklearn_model(model_type_int:int):
     elif model_type == GDBOOST:
         model = MultiOutputRegressor(GradientBoostingRegressor(loss='squared_error', learning_rate=0.1, max_depth=5, alpha=0.1, n_estimators=10, random_state=42))
     elif model_type == GREEK:
-        model = MultiOutputRegressor(MLPRegressor(hidden_layer_sizes=(100,), max_iter=500, random_state=42))
+        model = MultiOutputRegressor(ExtraTreesRegressor(n_estimators=100, random_state=42))
     return model
 
 
