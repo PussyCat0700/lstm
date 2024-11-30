@@ -5,14 +5,16 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_PE, path_loader
+from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TS_COORDS, path_loader
 
 
-def get_time_pe(start_time:pd.Timestamp, hours):
+H, W = 8, 8
+
+
+def get_time_pe(start_time:pd.Timestamp, periods, freq):
     # see CrossViVit/tscontext_dataset/TSContextDataset for details.
     # We are just borrowing their code here.
-    H, W = 1, 1
-    time_utc = pd.date_range(start=start_time.strftime('%Y-%m-%d %H:%M:%S'), periods=hours, freq="H", tz="UTC")
+    time_utc = pd.date_range(start=start_time.strftime('%Y-%m-%d %H:%M:%S'), periods=periods, freq=freq, tz="UTC")
     months = torch.from_numpy(time_utc.month.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
     days = torch.from_numpy(time_utc.day.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
     hours = torch.from_numpy(time_utc.hour.values)[(...,) + (None,) * 3].repeat(1, 1, H, W)
@@ -78,7 +80,7 @@ class PowerPlantDataset(Dataset):
         ])
         valid_times = [t for t in fixed_times if t <= nwp_time]
         closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H_%M_%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
         nwp_data = np.load(nwp_file)
         hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
         nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
@@ -164,18 +166,67 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        time_pe = get_time_pe(nwp_time, 48)
+        time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
+        time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
             KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
             KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
             KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
-            KEY_TIME_PE: time_pe,
+            KEY_TIME_NWP_PE: time_nwp_pe,
+            KEY_TIME_X_PE: time_x_pe,
         }
 
 
-class PowerPlantDailyDataset(PowerPlantDataset):
+class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
+    grid = torch.Tensor(np.array([[(x, y) for y in np.arange(54, 2.75, -0.25)] for x in np.arange(73, 136.25, 0.25)]))
+    
+    
+    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
+        super().__init__(split, plant_number, power_minmax, with_extra_span)
+        self.coords = np.load(path_loader.paths['source_coords_file'])
+    
+    def get_coords_neighbors(self):
+        
+        weather_coords = PowerPlantDatasetWithNeighbors.grid[
+            self.coords[self.plant_number, :, 0],
+            self.coords[self.plant_number, :, 1],
+            :
+        ]  # [64, 2]
+        weather_coords = weather_coords.reshape(H, W, 2).permute(2, 0, 1)  # [2, H, W]
+        return weather_coords
+
+    def get_coords_station(self):
+        meta = path_loader.meta
+        station_coords = torch.Tensor((meta['LONGITUDE'], meta['LATITUDE']))
+        return station_coords.unsqueeze(-1).unsqueeze(-1)  # [2, 1, 1]
+    
+    def normalize_coords(self, nb_coords, st_coords):
+        global_min = torch.min(nb_coords.min(), st_coords.min())
+        global_max = torch.max(nb_coords.max(), st_coords.max())
+        nb_coords_normalized = (nb_coords - global_min) / (global_max - global_min)
+        st_coords_normalized = (st_coords - global_min) / (global_max - global_min)
+        # Scale both tensors to [-1, 1]
+        nb_coords_normalized = 2 * nb_coords_normalized - 1
+        st_coords_normalized = 2 * st_coords_normalized - 1
+        return nb_coords_normalized, st_coords_normalized
+    
+    def __getitem__(self, idx):
+        ret = super().__getitem__(idx)
+        ts_coords = self.get_coords_station()
+        ctx_coords = self.get_coords_neighbors()
+        ctx_coords_scaled, ts_coords_scaled = self.normalize_coords(ctx_coords, ts_coords)
+        nwp_data = ret[KEY_NORM_NWP]
+        nwp_data_withcoords = nwp_data.permute(0, 2, 1)  # [T, H*W, C] -> [T, C, H*W]
+        nwp_data_withcoords = nwp_data_withcoords.reshape(*nwp_data_withcoords.shape[:2], H, W)
+        ret[KEY_NORM_NWP] = nwp_data_withcoords  # [T, C, H, W]
+        ret[KEY_CTX_COORDS] = ctx_coords_scaled
+        ret[KEY_TS_COORDS] = ts_coords_scaled
+        return ret
+        
+
+class PowerPlantDailyDataset(PowerPlantDatasetWithNeighbors):
     def __len__(self):
         return len(self.data) // 96 -  2  # Daily
 
@@ -185,7 +236,7 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         return start_time
 
 
-class PowerPlantHourlyDataset(PowerPlantDataset):
+class PowerPlantHourlyDataset(PowerPlantDatasetWithNeighbors):
     def __len__(self):
         return len(self.data) // 4 - (24+16+24)  # Hourly
     

@@ -11,7 +11,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, days=10, device='cuda'):
+def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, days=10, device='cuda', forward_model=None):
     model.eval()  # Set model to evaluation mode
     all_preds = []
     all_gts = []
@@ -19,11 +19,9 @@ def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename,
     with torch.no_grad():
         for batch in test_loader:
             REAL_Y = batch[KEY_REAL_Y].to(device)
-            nwp_data = batch[KEY_NORM_NWP].to(device)
-            # Generate predictions
-            preds = model(nwp_data)
+            loss, outputs = forward_model(batch, False)
             # If outputs are normalized, denormalize them (assuming `scaler` was used to normalize)
-            preds = denormalizer(preds).cpu().numpy()
+            preds = outputs.cpu().numpy()
             gt = REAL_Y.cpu().numpy()
             all_preds.extend(preds)
             all_gts.extend(gt)

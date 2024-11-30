@@ -10,13 +10,14 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, PLANTS, path_loader
+from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TS_COORDS, PLANTS, path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
-from constants import model_type_dict
+from constants import CROSS_VIVIT, model_type_dict
 
 
 def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=3):
     skip_model_selection = False
+    crossvt = args.with_neighbor 
     # 如果真按1k epochs训练效果会更好，但是8分钟才训完一个站，太慢了。
     # if skip_model_selection:
     #     patience = 100000  # magic number: inf
@@ -59,7 +60,29 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         start_epoch, best_val_loss = load_checkpoint(latest_checkpoint, model, optimizer)
     else:
         print("No checkpoint found, starting from scratch.")
-
+    def forward_model(batch, training:bool):
+        REAL_Y = batch[KEY_REAL_Y].to(device)
+        nwp_data = batch[KEY_NORM_NWP].to(device)
+        if crossvt:
+            history_x = batch[KEY_NORM_X].to(device).unsqueeze(-1)  # [B, T, C]
+            coords_x = batch[KEY_TS_COORDS].to(device)  # [B, 2, 1, 1]
+            coords_nwp = batch[KEY_CTX_COORDS].to(device)  # [B, 2, H, W]
+            time_coords_ctx = batch[KEY_TIME_NWP_PE].to(device)  # [B, T, C, H, W]
+            time_coords_ts = batch[KEY_TIME_X_PE].to(device)  # [B, T, C, H, W]
+            outputs = model(
+                ctx=nwp_data,
+                ctx_coords=coords_nwp,
+                ts=history_x,
+                ts_coords=coords_x,
+                time_coords_ctx=time_coords_ctx,
+                time_coords_ts=time_coords_ts,
+                mask=training,
+            )
+            outputs = outputs[0]
+        else:
+            outputs = model(nwp_data)
+        loss = criterion(denormalizer(outputs), REAL_Y)
+        return loss, outputs
     # Training loop
     if not args.test:
         for epoch in range(start_epoch, num_epochs):
@@ -68,12 +91,8 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             pbar = tqdm(train_loader)
             print(f'*****{epoch=}******')
             for batch_idx, batch in enumerate(pbar):
-                REAL_Y = batch[KEY_REAL_Y].to(device)
-                nwp_data = batch[KEY_NORM_NWP].to(device)
-                
                 optimizer.zero_grad()
-                outputs = model(nwp_data)
-                loss = criterion(denormalizer(outputs), REAL_Y)
+                loss = forward_model(batch, True)[0]
                 if torch.isnan(loss):
                     print("NaN detected in training loss. Stopping training.")
                     with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -97,10 +116,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             val_loss = 0.0
             with torch.no_grad():
                 for batch_idx, batch in enumerate(val_loader):
-                    REAL_Y = batch[KEY_REAL_Y].to(device)
-                    nwp_data = batch[KEY_NORM_NWP].to(device)
-                    outputs = model(nwp_data)
-                    loss = criterion(denormalizer(outputs), REAL_Y)
+                    loss = forward_model(batch, False)[0]
                     if torch.isnan(loss):
                         print("NaN detected in validation loss. Stopping training.")
                         with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -163,9 +179,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     with torch.no_grad():
         for batch_idx, batch in enumerate(val_loader):
             REAL_Y = batch[KEY_REAL_Y].to(device)
-            nwp_data = batch[KEY_NORM_NWP].to(device)
-            outputs = denormalizer(model(nwp_data))
-            loss = criterion(outputs, REAL_Y)
+            loss, outputs = forward_model(batch, False)
             test_loss += loss
             all_outputs.append(outputs.detach().cpu().numpy())
             all_gts.append(REAL_Y.detach().cpu().numpy())
@@ -192,7 +206,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     test_loss /= len(test_loader)
     print(f"Test Loss (Batched): {test_loss:.4f}")
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
+    mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device, forward_model=forward_model)
     print(mae)
     print(mse)
     if use_wandb:
@@ -230,6 +244,7 @@ if __name__ == "__main__":
     parser.add_argument("--test", action='store_true')
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
+    args.with_neighbor = args.model_type == CROSS_VIVIT
     args.num_epochs = 30
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)

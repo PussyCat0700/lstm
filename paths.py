@@ -12,7 +12,10 @@ KEY_REAL_Y = "real_y"
 KEY_NORM_X = "norm_x"
 KEY_NORM_Y = "norm_y"
 KEY_NORM_NWP = "norm_nwp"
-KEY_TIME_PE = "time_coordinates"
+KEY_TIME_NWP_PE = "time_coordinates_nwp"
+KEY_TIME_X_PE = "time_coordinates_x"
+KEY_CTX_COORDS = "spatial_coordinates"
+KEY_TS_COORDS = "station_coords"
 
 class LazyPathLoader:
     def __init__(self):
@@ -31,20 +34,20 @@ class LazyPathLoader:
             self.ablation_name = months
         # init paths
         df = pd.read_csv(self.config['paths']['source_power_stat'])
-        plant_dict_idx = 0
         for idx, row in df.iterrows():
             plant_no = row["PLANT_NO"]
             plant_type = row.get("TYPE", None)
             if self.type_value is not None and plant_type != self.type_value:
+                self.plantnumdict[idx] = None
                 continue
-            self.plantnumdict[plant_dict_idx] = int(plant_no)
-            plant_dict_idx += 1
+            self.plantnumdict[idx] = int(plant_no)
         self.plant_id = self.plantnumdict.get(self.plant_number, None)
         print(f'Specified plant # {self.plant_number}/{len(self.plantnumdict)} is actually {self.plant_id} officially.')
         if self.plant_number >= len(self.plantnumdict):
             print(f"Warning: {self.plant_number=} out of range for {len(self.plantnumdict)}.")
         if self.plant_id is not None:
             self.paths = self._prep_paths()
+            self.meta = df.iloc[self.plant_number]
     
     def _prep_paths(self):
         _paths = self._update_paths(self.config['paths'])

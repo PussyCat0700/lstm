@@ -36,22 +36,22 @@ class Cyclical_embedding(nn.Module):
 class RoCrossViViT(nn.Module):
     def __init__(
         self,
-        image_size = [64, 64],
-        patch_size = [8, 8],
-        time_coords_encoder: nn.Module = Cyclical_embedding(),
+        image_size = [8, 8],
+        patch_size = [1, 1],
+        time_coords_encoder = Cyclical_embedding([12, 31, 24, 60]),
         dim: int = 128,
         depth: int = 4,
         heads: int = 4,
         mlp_ratio: int = 4,
-        ctx_channels: int = 3,
-        ts_channels: int = 3,
+        ctx_channels: int = 27,
+        ts_channels: int = 1,
         ts_length: int = 48,
         out_dim: int = 1,
         dim_head: int = 64,
         dropout: float = 0.0,
         freq_type: str = "lucidrains",
         pe_type: str = "rope",
-        num_mlp_heads: int = 1,
+        num_mlp_heads: int = 2,
         use_glu: bool = True,
         ctx_masking_ratio: float = 0.9,
         ts_masking_ratio: float = 0.9,
@@ -105,8 +105,10 @@ class RoCrossViViT(nn.Module):
             ),
             nn.Linear(patch_dim, dim),
         )
+        kwargs["max_freq"] = 128
         self.enc_pos_emb = AxialRotaryEmbedding(dim_head, freq_type, **kwargs)
         self.ts_embedding = nn.Linear(self.ts_channels, dim)
+        self.ts_downsampler = nn.Conv1d(1, 1, 2, 2)
         self.ctx_encoder = VisionTransformer(
             dim,
             depth,
@@ -215,7 +217,8 @@ class RoCrossViViT(nn.Module):
         ctx_coords: torch.Tensor,
         ts: torch.Tensor,
         ts_coords: torch.Tensor,
-        time_coords: torch.Tensor,
+        time_coords_ctx: torch.Tensor,
+        time_coords_ts: torch.Tensor,
         mask: bool = True,
     ):
         """
@@ -224,17 +227,20 @@ class RoCrossViViT(nn.Module):
             ctx_coords (torch.Tensor): Coordinates of context frames of shape [B, 2, H, W]
             ts (torch.Tensor): Station timeseries of shape [B, T, C]
             ts_coords (torch.Tensor): Station coordinates of shape [B, 2, 1, 1]
-            time_coords (torch.Tensor): Time coordinates of shape [B, T, C, H, W]
+            time_coords_ctx (torch.Tensor): Time coordinates of shape [B, T, C, H, W] in every 1 hour
+            time_coords_ts (torch.Tensor): Time coordinates of shape [B, T, C, H, W] in every 30 mins
+            Note that time_coords_ctx/ts must have the same length for otherwise CA's spatial attention won't work.
             mask (bool): Whether to mask or not. Useful for inference
         Returns:
 
         """
         B, T, _, H, W = ctx.shape
-        time_coords = self.time_coords_encoder(time_coords)
+        ts = self.ts_downsampler(ts.transpose(-1, -2)).transpose(-1, -2)
+        time_coords_ctx = self.time_coords_encoder(time_coords_ctx)
+        time_coords_ts = self.time_coords_encoder(time_coords_ts)
 
-        ctx = torch.cat([ctx, time_coords], axis=2)
-        ts = torch.cat([ts, time_coords[..., 0, 0]], axis=-1)
-
+        ctx = torch.cat([ctx, time_coords_ctx], axis=2)
+        ts = torch.cat([ts, time_coords_ts[..., 0, 0]], axis=-1)
         ctx = rearrange(ctx, "b t c h w -> (b t) c h w")
 
         ctx_coords = repeat(ctx_coords, "b c h w -> (b t) c h w", t=T)
@@ -296,6 +302,7 @@ class RoCrossViViT(nn.Module):
             output = mlp(y)
             outputs.append(output)
         outputs = torch.stack(outputs, dim=2)
+        outputs = outputs.reshape(B, -1)  # [B, 2T]
 
         quantile_mask = self.quantile_masker(rearrange(y.detach(), "b t c -> b c t"))
 
