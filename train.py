@@ -1,5 +1,7 @@
 import csv
 import os
+import sys
+import traceback
 import numpy as np
 from draw import plot_predictions_vs_ground_truth_vanilla
 import argparse
@@ -261,22 +263,30 @@ if __name__ == "__main__":
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
-    print(f"ckpt: {args.checkpoint_dir}")
-    if not path_loader.check_exists():
-        print(f"{args.plant_number} does not have source input file")
-        exit(0)
-    if is_done:
-        if args.test:
-            files_to_check = [os.path.join(args.checkpoint_dir, x) for x in ['all_gts.npy', 'all_preds.npy']]
-            files_to_check2 = os.path.join(args.checkpoint_dir, 'output.csv')
-            if all([os.path.isfile(file) for file in files_to_check]) or os.path.isfile(files_to_check2):
-                print("test enabled but files are generated.")
+    logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
+    with open(logger_file, 'w') as sys.stdout:
+        print(f"ckpt: {args.checkpoint_dir}")
+        if not path_loader.check_exists():
+            print(f"{args.plant_number} does not have source input file")
+            exit(0)
+        if is_done:
+            if args.test:
+                files_to_check = [os.path.join(args.checkpoint_dir, x) for x in ['all_gts.npy', 'all_preds.npy']]
+                files_to_check2 = os.path.join(args.checkpoint_dir, 'output.csv')
+                if all([os.path.isfile(file) for file in files_to_check]) or os.path.isfile(files_to_check2):
+                    print("test enabled but files are generated.")
+                    exit(0)
+            else:
+                print(f"{args.plant_number} already has output metrics.csv at {args.checkpoint_dir}")
                 exit(0)
         else:
-            print(f"{args.plant_number} already has output metrics.csv at {args.checkpoint_dir}")
-            exit(0)
-    else:
-        if args.test:
-            print("Not done! No test!")
-            exit(0)
-    main(args)
+            if args.test:
+                print("Not done! No test!")
+                exit(0)
+        try:
+            main(args)
+        except Exception as e:
+            with open(os.path.join(args.checkpoint_dir, 'log.err'), 'w') as error_file:
+                error_file.write(f"Error occurred: {str(e)}\n")
+                # Optionally, write the full traceback for debugging
+                traceback.print_exc(file=error_file)
