@@ -13,6 +13,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TS_COORDS, PLANTS, path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import CROSS_VIVIT, model_type_dict
+from pytorch_lightning import seed_everything
+
+
+seed_everything(42)
 
 
 def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=3):
@@ -24,7 +28,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
     # Set up TensorBoard writer or Weights & Biases logging
     if use_wandb:
         wandb.init(
@@ -81,8 +85,9 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             outputs = outputs[0]
         else:
             outputs = model(nwp_data)
-        loss = criterion(denormalizer(outputs), REAL_Y)
-        return loss, outputs
+        outputs_denormalized = denormalizer(outputs)
+        loss = criterion(outputs_denormalized, REAL_Y)
+        return loss, outputs_denormalized
     # Training loop
     if not args.test:
         for epoch in range(start_epoch, num_epochs):
@@ -177,7 +182,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     all_outputs = []
     all_gts = []
     with torch.no_grad():
-        for batch_idx, batch in enumerate(val_loader):
+        for batch_idx, batch in enumerate(test_loader):
             REAL_Y = batch[KEY_REAL_Y].to(device)
             loss, outputs = forward_model(batch, False)
             test_loss += loss

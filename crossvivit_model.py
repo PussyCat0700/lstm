@@ -54,7 +54,7 @@ class RoCrossViViT(nn.Module):
         num_mlp_heads: int = 2,
         use_glu: bool = True,
         ctx_masking_ratio: float = 0.9,
-        ts_masking_ratio: float = 0.9,
+        ts_masking_ratio: float = 0,
         decoder_dim: int = 128,
         decoder_depth: int = 4,
         decoder_heads: int = 6,
@@ -166,15 +166,15 @@ class RoCrossViViT(nn.Module):
                 nn.Sequential(
                     nn.LayerNorm(decoder_dim),
                     nn.Linear(decoder_dim, out_dim, bias=True),
-                    nn.ReLU(),
+                    nn.LeakyReLU(),
                 )
             )
 
         self.quantile_masker = nn.Sequential(
             nn.Conv1d(decoder_dim, dim, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv1d(dim, dim, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             Rearrange(
                 "b c t -> b t c",
             ),
@@ -301,12 +301,11 @@ class RoCrossViViT(nn.Module):
             mlp = self.mlp_heads[i]
             output = mlp(y)
             outputs.append(output)
-        outputs = torch.stack(outputs, dim=2)
-        outputs = outputs.reshape(B, -1)  # [B, 2T]
-
+        outputs_stacked = torch.stack(outputs, dim=2)
+        outputs_stacked = outputs_stacked.reshape(B, -1)  # [B, 2T]
         quantile_mask = self.quantile_masker(rearrange(y.detach(), "b t c -> b c t"))
 
-        return (outputs, quantile_mask, self_attention_scores, cross_attention_scores)
+        return (outputs_stacked, quantile_mask, self_attention_scores, cross_attention_scores)
 
 
 class ContextMixerModule(ABC, pl.LightningModule):
