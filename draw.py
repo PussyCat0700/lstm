@@ -1,37 +1,12 @@
-import argparse
 import os
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
-from dataloading import get_latest_checkpoint, load_checkpoint
-from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_REAL_Y
-from utils import get_model_and_loader
-from constants import model_type_dict
-import torch
+import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, days=10, device='cuda', forward_model=None):
-    model.eval()  # Set model to evaluation mode
-    all_preds = []
-    all_gts = []
-    
-    with torch.no_grad():
-        for batch in test_loader:
-            REAL_Y = batch[KEY_REAL_Y].to(device)
-            loss, outputs = forward_model(batch, False)
-            # If outputs are normalized, denormalize them (assuming `scaler` was used to normalize)
-            preds = outputs.cpu().numpy()
-            gt = REAL_Y.cpu().numpy()
-            all_preds.extend(preds)
-            all_gts.extend(gt)
-    
-    # Convert lists to numpy arrays
-    all_preds = np.array(all_preds).flatten()
-    all_gts = np.array(all_gts).flatten()
-    return plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days)
 
-def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10):
+def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=10, all_y_times=None):
     mae = np.mean(np.abs(all_preds - all_gts))
     mse = np.mean(np.abs(all_preds - all_gts) ** 2)
     # Plot the results
@@ -44,33 +19,14 @@ def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=
     plt.legend()
     plt.savefig(filename)
     dir_name = os.path.dirname(filename)
-    np.save(os.path.join(dir_name, 'all_preds.npy'), all_preds)
-    np.save(os.path.join(dir_name, 'all_gts.npy'), all_gts)
+    if all_y_times is None:
+        np.save(os.path.join(dir_name, 'all_preds.npy'), all_preds)
+        np.save(os.path.join(dir_name, 'all_gts.npy'), all_gts)
+    else:
+        df = pd.DataFrame({
+            'Datetime': all_y_times,
+            'Predictions': all_preds,
+            'Ground Truth': all_gts
+        })
+        df.to_csv(os.path.join(dir_name, 'output.csv'), index=False)
     return mae, mse
-
-# Example usage
-# plot_predictions_vs_ground_truth(model, test_loader, scaler, device='cuda')
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
-    parser.add_argument("model_type", type=int)
-    parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
-    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save model checkpoints")
-    
-    args = parser.parse_args()
-    args.model_type = model_type_dict[args.model_type]
-    print(f'now drawing for {args.model_type}')
-    # Set up device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # Get data loaders and model
-    model, train_loader, val_loader, test_loader, denormalizer = get_model_and_loader(args, device)
-
-    latest_checkpoint = get_latest_checkpoint(args.checkpoint_dir)
-    print(f'loading from {latest_checkpoint}')
-    _, _ = load_checkpoint(latest_checkpoint, model, None)
-    filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device)
-    print(mae)
-    print(mse)

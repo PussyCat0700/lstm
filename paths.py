@@ -16,6 +16,8 @@ KEY_TIME_NWP_PE = "time_coordinates_nwp"
 KEY_TIME_X_PE = "time_coordinates_x"
 KEY_CTX_COORDS = "spatial_coordinates"
 KEY_TS_COORDS = "station_coords"
+KEY_TIME_X = "time_x"
+KEY_TIME_Y = "time_y"
 
 class LazyPathLoader:
     def __init__(self):

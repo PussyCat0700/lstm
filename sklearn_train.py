@@ -1,5 +1,6 @@
 import argparse
 import pickle
+import numpy as np
 from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
 from constants import sklearn_model_type_dict
@@ -44,6 +45,8 @@ try:
     preds_test = denormalizer(preds_test)
     preds_test = preds_test.flatten()
     Y_test_real = Y_test_real.flatten()
+    preds_test = np.maximum(preds_test, 0)
+    Y_test_real = np.maximum(Y_test_real, 0)
     all_metrics = compute_all_metrics(preds_test, Y_test_real, denormalizer(1.0))
     print(all_metrics)
     metrics_path = os.path.join(save_path, 'metrics.csv')

@@ -1,6 +1,7 @@
 import csv
 import os
-from draw import plot_predictions_vs_ground_truth
+import numpy as np
+from draw import plot_predictions_vs_ground_truth_vanilla
 import argparse
 import torch
 import torch.nn as nn
@@ -10,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TS_COORDS, PLANTS, path_loader
+from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TIME_Y, KEY_TS_COORDS, PLANTS, path_loader
 from utils import compute_all_metrics, get_model_and_loader, get_parameter_number
 from constants import CROSS_VIVIT, model_type_dict
 from pytorch_lightning import seed_everything
@@ -181,18 +182,24 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     test_loss = 0.0
     all_outputs = []
     all_gts = []
+    all_y_times = []
     with torch.no_grad():
         for batch_idx, batch in enumerate(test_loader):
             REAL_Y = batch[KEY_REAL_Y].to(device)
+            TIME_Y = batch[KEY_TIME_Y]
+            TIME_Y = np.array(TIME_Y).T.flatten()  # tackle the mysterious way torch dataloader handles list of string.
+            all_y_times.append(TIME_Y)
             loss, outputs = forward_model(batch, False)
             test_loss += loss
             all_outputs.append(outputs.detach().cpu().numpy())
             all_gts.append(REAL_Y.detach().cpu().numpy())
-            
             if use_wandb:
                 wandb.log({"test_loss": loss.item()})
             else:
                 writer.add_scalar("Loss/test", loss.item(), batch_idx)
+    all_outputs = np.maximum(np.concatenate(all_outputs, axis=0).flatten(), 0)
+    all_gts = np.maximum(np.concatenate(all_gts, axis=0).flatten(), 0)
+    all_y_times = np.concatenate(all_y_times)
     all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
     def write_csv():
         csv_filename = os.path.join(checkpoint_dir, 'metrics.csv')
@@ -211,7 +218,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     test_loss /= len(test_loader)
     print(f"Test Loss (Batched): {test_loss:.4f}")
     filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    mae, mse = plot_predictions_vs_ground_truth(model, test_loader, denormalizer, filename, device=device, forward_model=forward_model)
+    mae, mse = plot_predictions_vs_ground_truth_vanilla(all_outputs, all_gts, filename, all_y_times=all_y_times)
     print(mae)
     print(mse)
     if use_wandb:
@@ -261,7 +268,8 @@ if __name__ == "__main__":
     if is_done:
         if args.test:
             files_to_check = [os.path.join(args.checkpoint_dir, x) for x in ['all_gts.npy', 'all_preds.npy']]
-            if all([os.path.isfile(file) for file in files_to_check]):
+            files_to_check2 = os.path.join(args.checkpoint_dir, 'output.csv')
+            if all([os.path.isfile(file) for file in files_to_check]) or os.path.isfile(files_to_check2):
                 print("test enabled but files are generated.")
                 exit(0)
         else:

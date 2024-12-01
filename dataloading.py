@@ -5,7 +5,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X_PE, KEY_TS_COORDS, path_loader
+from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X, KEY_TIME_X_PE, KEY_TIME_Y, KEY_TS_COORDS, path_loader
 
 
 H, W = 8, 8
@@ -168,6 +168,8 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
         time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
         time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
+        time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
@@ -176,6 +178,8 @@ class PowerPlantDataset(Dataset):
             KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
             KEY_TIME_NWP_PE: time_nwp_pe,
             KEY_TIME_X_PE: time_x_pe,
+            KEY_TIME_X: time_x,
+            KEY_TIME_Y: time_y,
         }
 
 
@@ -412,8 +416,9 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
-    path_loader.init('12m', 'nmg', 0)
-    get_dataset_and_denormalizer_sklearn(0, "valid", "here")
-    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(0, 1)
+    plant_number = 298
+    path_loader.init('12m', 'nmg', plant_number)
+    get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
+    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1)
     for batch in val_loader:
         print(batch)
