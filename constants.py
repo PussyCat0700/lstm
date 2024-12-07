@@ -4,6 +4,7 @@ GPNN = "GPNN"
 CNN_LSTM = "CNN_LSTM"
 CROSS_VIVIT = "CROSS_VIVIT"
 XGBOOST = "XGBOOST"
+XGBOOST_DR_PU = "XGBOOST_P"
 GPCF = "GPCF"
 GDBOOST = "GradientBoost"
 GREEK = "Greek"
@@ -19,4 +20,5 @@ sklearn_model_type_dict = {
     1: GPCF,
     2: GDBOOST,
     3: GREEK,
+    4: XGBOOST_DR_PU,
 }

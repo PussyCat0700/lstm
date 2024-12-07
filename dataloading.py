@@ -323,9 +323,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
     X_file_real = os.path.join(folder_path, "X_real.csv")
     Y_file_real = os.path.join(folder_path, "Y_real.csv")
     nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
-    try:
-        return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
-    except Exception as e:
+    ready_sign_path = os.path.join(folder_path, "READY")
+    if not os.path.exists(ready_sign_path):
         print(f"Saving dataset to CSV in {folder_path}...")
 
         # 打开文件，以写入模式逐步保存数据
@@ -350,8 +349,9 @@ def convert_torch_dataset_to_csv(dataset, folder_path):
                 writer_X_real.writerow(item[KEY_REAL_X].tolist())        # 保存 X_norm
                 writer_Y_real.writerow(item[KEY_REAL_Y].tolist())        # 保存 Y_norm
                 writer_nwp.writerow(item[KEY_NORM_NWP].tolist())  # 保存nwp_data_scaled展平为一行
-    finally:
-        return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
+        with open(ready_sign_path, "w") as f:
+            f.write("")
+    return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
 
 
 def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
