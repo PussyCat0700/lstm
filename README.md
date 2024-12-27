@@ -9,6 +9,8 @@ A High-Accuracy Wind Power Forecasting Model (Letter)
 濮博【Adapted，原先功率他做的是分位预测，我把他竞价预测的拟合方法直接挪到功率上用了】
 ## GPNN
 Xin Yu's Implementation
+## RandomForest
+Day-Ahead Hourly Forecasting of Power Generation From Photovoltaic Plants
 # Steps
 1. create a yaml configuration file under `./conf`.
 1. Use `preprocess.py`

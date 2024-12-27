@@ -3,7 +3,7 @@ paths:
   source_power_file: "/data1/yfliu/solar_baseline/solar/nmg_data_new/{plant_number}.csv"
   source_power_stat: "/data1/yfliu/solar_baseline/solar/nmg_data_new/nmg_info.csv"
   source_coords_file: "/data1/yfliu/solar_baseline/solar/nmg_data_new/nmg_windfarm_coord.npy"
-  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/wneighbors/{plant_number}"
+  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/weather_china_all_interp/{plant_number}"
   processed_dir: "/data1/yfliu/solar_baseline/solar/preprocessed"
   results_save_path: "/data1/yfliu/solar_baseline/nmg"
 params:
