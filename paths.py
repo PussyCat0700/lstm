@@ -6,6 +6,7 @@ import pandas as pd
 PLANTS = {
     "china": './conf/solar/china.yaml',
     "nmg": './conf/solar/nmg.yaml',
+    "china_add": './conf/solar/china_add.yaml',
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
@@ -35,7 +36,7 @@ class LazyPathLoader:
         if months != '12m':
             self.ablation_name = months
         # init paths
-        df = pd.read_csv(self.config['paths']['source_power_stat'])
+        df = pd.read_csv(self.config['paths']['source_power_stat'], dtype={'PLANT_NO': str})
         for idx, row in df.iterrows():
             plant_no = row["PLANT_NO"]
             plant_type = row.get("TYPE", None)

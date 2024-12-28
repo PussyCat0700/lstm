@@ -13,6 +13,6 @@ Xin Yu's Implementation
 Day-Ahead Hourly Forecasting of Power Generation From Photovoltaic Plants
 # Steps
 1. create a yaml configuration file under `./conf`.
-1. Use `preprocess.py`
+1. Use `preprocess.py`. Remeber to replace SPLIT variable to the split associated with your newly created file in `./conf` first!
 1. Train! But please note that checkpoint path for several models need to be manually specified.
 1. Gather your results with `gather_results.py`

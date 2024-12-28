@@ -4,6 +4,10 @@ from tqdm import tqdm
 import argparse
 from paths import path_loader
 
+# HYPER
+SPLIT = "china_add"
+
+
 def interpolate_missing_data(df):
     """
     Interpolates missing data in the DataFrame where missing values are identified by -999.
@@ -33,8 +37,8 @@ def save_data(train_file, test_file, train_power_file, valid_power_file, test_po
     split_idx = int(len(train_file) * split)
     valid_df = train_file.iloc[split_idx:]
     train_df = train_file.iloc[:split_idx]
-    split_date = train_df['Unnamed: 0'].min() + pd.DateOffset(months=months)
-    train_df = train_df[train_df['Unnamed: 0'] < split_date]
+    split_date = train_df.iloc[:, 0].min() + pd.DateOffset(months=months)
+    train_df = train_df[train_df.iloc[:, 0] < split_date]
     test_df = test_file
     train_df.to_csv(train_power_file, index=False)
     valid_df.to_csv(valid_power_file, index=False)
@@ -52,31 +56,30 @@ def load_data(train_filename, test_filename):
         dict: A dictionary containing loaded training and testing data.
     """
     if os.path.exists(train_filename) and os.path.exists(test_filename):
-        training_set = pd.read_csv(train_filename).drop(columns=['Unnamed: 0']).values
-        testing_set = pd.read_csv(test_filename).drop(columns=['Unnamed: 0']).values
+        training_set = pd.read_csv(train_filename).iloc[:, 1:].values  # 删除第一列
+        testing_set = pd.read_csv(test_filename).iloc[:, 1:].values  # 删除第一列
     return {
         "train": training_set,
         "test": testing_set,
     }
 
 def get_data(plant_number, months, overwrite=False):
-    path_loader.init(f"{args.months}m", "china", plant_number)
+    path_loader.init(f"{args.months}m", SPLIT, plant_number)
     train_power_file = path_loader.paths['train_power_file']
     valid_power_file = path_loader.paths['valid_power_file']
     test_power_file = path_loader.paths['test_power_file']
     source_power_file = path_loader.paths['source_power_file']
     if not os.path.exists(source_power_file):
-        print(f'{source_power_file} does not exist')
-        return None
+        raise RuntimeError(f'{source_power_file} does not exist')
     if overwrite or not os.path.exists(train_power_file) or not os.path.exists(test_power_file):
         # Load and preprocess data
         data = pd.read_csv(source_power_file)
         # Handle missing data (-999) with linear interpolation
         data = interpolate_missing_data(data)
-        data['Unnamed: 0'] = pd.to_datetime(data['Unnamed: 0'])
-        split_date = data['Unnamed: 0'].min() + pd.DateOffset(years=1)
-        training_set = data[data['Unnamed: 0'] < split_date]
-        testing_set = data[data['Unnamed: 0'] >= split_date]
+        data.iloc[:, 0] = pd.to_datetime(data.iloc[:, 0])
+        split_date = data.iloc[:, 0].min() + pd.DateOffset(years=1)
+        training_set = data[data.iloc[:, 0] < split_date]
+        testing_set = data[data.iloc[:, 0] >= split_date]
         # Save the processed data
         save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file, months=months)
     
@@ -84,12 +87,18 @@ def get_data(plant_number, months, overwrite=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('csv_dir')
     parser.add_argument("months", type=int)
+    parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
-    path_loader.init(args.months, "china", 0)
-    df = pd.read_csv("/data1/yfliu/solar_baseline/solar/china_data/china_info.csv")
+    path_loader.init(f'{args.months}m', SPLIT, 0)
+    df = pd.read_csv(f"{args.csv_dir}")
+    sorted_csv_dir = os.path.join(os.path.dirname(args.csv_dir), f'sorted_{os.path.basename(args.csv_dir)}')
+    if not os.path.exists(sorted_csv_dir):
+        df = df.sort_values(by='TYPE')
+        df.to_csv(sorted_csv_dir)
     pbar = tqdm(range(len(df)))
     for idx, row in df.iterrows():
         plant_no = idx
-        get_data(plant_no, months=args.months, overwrite=True)
+        get_data(plant_no, months=args.months, overwrite=args.overwrite)
         pbar.update()
