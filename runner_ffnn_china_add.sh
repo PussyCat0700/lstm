@@ -4,7 +4,7 @@
 #SBATCH --job-name=ffnn_china_add
 #SBATCH --partition=RTX3090,RTX4090
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
-#SBATCH --array=0-398:16%2       # 任务ID范围
+#SBATCH --array=0-243:16%2       # 任务ID范围
 #SBATCH --mem=80GB
 #SBATCH --qos=ne_ablation
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
