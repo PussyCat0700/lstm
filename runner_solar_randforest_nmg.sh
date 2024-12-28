@@ -1,15 +1,15 @@
 #!/bin/bash
 
 #SBATCH --account=yfliu3
-#SBATCH --job-name=xgboostpb_nmg
+#SBATCH --job-name=randforest_nmg_solar
 #SBATCH --time=00:15:00
 #SBATCH --partition=RTX3090,RTX4090,A100,ADA6000
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
 #SBATCH --array=0-438:10%1       # 任务ID范围
 #SBATCH --mem=40GB
 #SBATCH --qos=ne_ablation
-#SBATCH --output=./logs/nmg/xgboostpb_%A_%a.out
-#SBATCH --error=./logs/nmg/xgboostpb_%A_%a.err
+#SBATCH --output=./logs/station_logs/nmg/randforest_%A_%a.out
+#SBATCH --error=./logs/station_logs/nmg/randforest_%A_%a.err
 #SBATCH --time=7-00:00:00
 
 # 获取当前任务ID
@@ -20,9 +20,9 @@ echo $1
 for i in $(seq 0 $((offset-1)))
 do
     plant_number=$((task_id + i))
-    echo "Running task for plant_number: $plant_number"
-    logdir=/data1/yfliu/logs/solar/nmg/xgboostpb/${1}_${task_id}_${plant_number}
+    logdir=/data1/yfliu/logs/solar/nmg/randforest/${1}_${task_id}_${plant_number}
+    echo "Running task under: " $logdir
     mkdir -p $logdir
-    python sklearn_train.py 4 --plant_number $plant_number --months $1 --plant_set "nmg" > "$logdir/log.txt" 2>&1 &
+    python sklearn_train.py 5 --plant_number $plant_number --months $1 --plant_set "nmg" --plant_type 1 > "$logdir/log.txt" 2>&1 &
 done
 wait

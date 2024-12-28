@@ -230,7 +230,7 @@ class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
         return ret
         
 
-class PowerPlantDailyDataset(PowerPlantDatasetWithNeighbors):
+class PowerPlantDailyDataset(PowerPlantDataset):
     def __len__(self):
         return len(self.data) // 96 -  2  # Daily
 
@@ -240,7 +240,7 @@ class PowerPlantDailyDataset(PowerPlantDatasetWithNeighbors):
         return start_time
 
 
-class PowerPlantHourlyDataset(PowerPlantDatasetWithNeighbors):
+class PowerPlantHourlyDataset(PowerPlantDataset):
     def __len__(self):
         return len(self.data) // 4 - (24+16+24)  # Hourly
     

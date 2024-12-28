@@ -263,9 +263,9 @@ if __name__ == "__main__":
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
+    print(f"ckpt: {args.checkpoint_dir}")
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
     with open(logger_file, 'w') as sys.stdout:
-        print(f"ckpt: {args.checkpoint_dir}")
         if not path_loader.check_exists():
             print(f"{args.plant_number} does not have source input file")
             exit(0)
