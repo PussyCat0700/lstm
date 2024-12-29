@@ -8,8 +8,8 @@
 #SBATCH --array=0-74:10%1       # 任务ID范围
 #SBATCH --mem=40GB
 #SBATCH --qos=ne_ablation
-#SBATCH --output=./logs/china_add/xgboostpb_%A_%a.out
-#SBATCH --error=./logs/china_add/xgboostpb_%A_%a.err
+#SBATCH --output=./logs/station_logs/china_add/xgboostpb_%A_%a.out
+#SBATCH --error=./logs/station_logs/china_add/xgboostpb_%A_%a.err
 #SBATCH --time=7-00:00:00
 
 # 获取当前任务ID
@@ -24,6 +24,6 @@ do
     logdir=/data1/yfliu/logs/solar/china_add/xgboostpb/${1}_${task_id}_${plant_number}
     echo "exporting to" "$logdir/log.txt"
     mkdir -p $logdir
-    python sklearn_train.py 4 --plant_number $plant_number --months $1 --plant_set "china_add"> "$logdir/log.txt" 2>&1 &
+    python sklearn_train.py 4 --plant_number $plant_number --months $1 --plant_set "china_add" --plant_type 0 > "$logdir/log.txt" 2>&1 &
 done
 wait
