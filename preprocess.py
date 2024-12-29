@@ -63,7 +63,7 @@ def load_data(train_filename, test_filename):
         "test": testing_set,
     }
 
-def get_data(plant_number, months, overwrite=False):
+def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:00'):
     path_loader.init(f"{args.months}m", SPLIT, plant_number)
     train_power_file = path_loader.paths['train_power_file']
     valid_power_file = path_loader.paths['valid_power_file']
@@ -77,9 +77,10 @@ def get_data(plant_number, months, overwrite=False):
         # Handle missing data (-999) with linear interpolation
         data = interpolate_missing_data(data)
         data.iloc[:, 0] = pd.to_datetime(data.iloc[:, 0])
+        fin_time = pd.to_datetime(fin_time)
         split_date = data.iloc[:, 0].min() + pd.DateOffset(years=1)
         training_set = data[data.iloc[:, 0] < split_date]
-        testing_set = data[data.iloc[:, 0] >= split_date]
+        testing_set = data[(data.iloc[:, 0] >= split_date) & (data.iloc[:, 0] <= fin_time)]
         # Save the processed data
         save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file, months=months)
     
@@ -87,16 +88,18 @@ def get_data(plant_number, months, overwrite=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('csv_dir')
+    parser.add_argument('csv_dir', help='path to original plant info csv.')
     parser.add_argument("months", type=int)
     parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
     path_loader.init(f'{args.months}m', SPLIT, 0)
-    df = pd.read_csv(f"{args.csv_dir}")
     sorted_csv_dir = os.path.join(os.path.dirname(args.csv_dir), f'sorted_{os.path.basename(args.csv_dir)}')
     if not os.path.exists(sorted_csv_dir):
+        df = pd.read_csv(f"{args.csv_dir}")
         df = df.sort_values(by='TYPE')
         df.to_csv(sorted_csv_dir)
+    else:
+        df = pd.read_csv(sorted_csv_dir)
     pbar = tqdm(range(len(df)))
     for idx, row in df.iterrows():
         plant_no = idx
