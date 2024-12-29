@@ -5,7 +5,7 @@
 #SBATCH --time=00:15:00
 #SBATCH --partition=RTX3090,RTX4090,ADA6000
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
-#SBATCH --array=0-243:10%1       # 任务ID范围
+#SBATCH --array=0-74:10%1       # 任务ID范围
 #SBATCH --mem=40GB
 #SBATCH --qos=ne_ablation
 #SBATCH --output=./logs/station_logs/china_add/greek_%A_%a.out
