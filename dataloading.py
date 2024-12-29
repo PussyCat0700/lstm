@@ -101,8 +101,8 @@ class PowerPlantDataset(Dataset):
                 if global_min is None:
                     global_min = np.full((data.shape[-1]), np.inf)
                 # 计算每个变量的最小值和最大值
-                local_max = np.max(data, axis=0) 
-                local_min = np.min(data, axis=0)
+                local_max = np.max(data, axis=tuple(range(data.ndim - 1)))
+                local_min = np.min(data, axis=tuple(range(data.ndim - 1)))
                 
                 # 更新全局最大值和最小值
                 global_max = np.maximum(global_max, local_max)
