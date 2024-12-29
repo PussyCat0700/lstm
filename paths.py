@@ -20,6 +20,12 @@ KEY_TS_COORDS = "station_coords"
 KEY_TIME_X = "time_x"
 KEY_TIME_Y = "time_y"
 
+
+def read_station_info(csv_file):
+    df = pd.read_csv(csv_file, dtype={'PLANT_NO': str})
+    return df
+
+
 class LazyPathLoader:
     def __init__(self):
         # Subject to change considering different type_value.
@@ -36,14 +42,14 @@ class LazyPathLoader:
         if months != '12m':
             self.ablation_name = months
         # init paths
-        df = pd.read_csv(self.config['paths']['source_power_stat'], dtype={'PLANT_NO': str})
+        df = read_station_info(self.config['paths']['source_power_stat'])
         for idx, row in df.iterrows():
             plant_no = row["PLANT_NO"]
             plant_type = row.get("TYPE", None)
             if self.type_value is not None and plant_type != self.type_value:
                 self.plantnumdict[idx] = None
                 continue
-            self.plantnumdict[idx] = int(plant_no)
+            self.plantnumdict[idx] = plant_no
         self.plant_id = self.plantnumdict.get(self.plant_number, None)
         print(f'Specified plant # {self.plant_number}/{len(self.plantnumdict)} is actually {self.plant_id} officially.')
         if self.plant_number >= len(self.plantnumdict):
