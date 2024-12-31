@@ -3,6 +3,7 @@ FFNN = "FFNN"
 GPNN = "GPNN"
 CNN_LSTM = "CNN_LSTM"
 CROSS_VIVIT = "CROSS_VIVIT"
+PVTRANS_E = "PVTRANS_E"
 XGBOOST = "XGBOOST"
 XGBOOST_DR_PU = "XGBOOST_P"
 RANDOM_FOREST = "RDFR"
@@ -15,6 +16,7 @@ model_type_dict = {
     2: GPNN,
     3: CNN_LSTM,
     4: CROSS_VIVIT,
+    5: PVTRANS_E,
 }
 sklearn_model_type_dict = {
     0: XGBOOST,

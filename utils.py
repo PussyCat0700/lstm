@@ -1,7 +1,8 @@
 import csv
 import numpy as np
-from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, LSTM, RANDOM_FOREST, XGBOOST, XGBOOST_DR_PU, sklearn_model_type_dict
+from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, LSTM, PVTRANS_E, RANDOM_FOREST, XGBOOST, XGBOOST_DR_PU, sklearn_model_type_dict
 from dataloading import get_data_loaders_and_denormalizer
+from pvtransnet import PVTransNetE
 from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
 import xgboost as xgb
@@ -42,6 +43,9 @@ def get_model_and_loader(args, device):
     elif args.model_type == CROSS_VIVIT:
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
         model = RoCrossViViT().to(device)
+    elif args.model_type == PVTRANS_E:
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        model = PVTransNetE().to(device)
     return model, train_loader, val_loader, test_loader, denormalizer
 
 

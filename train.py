@@ -22,13 +22,22 @@ from pytorch_lightning import seed_everything
 seed_everything(42)
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, num_epochs, use_wandb=False, log_dir="runs", checkpoint_dir="checkpoints", weight_decay=1e-5, patience=3):
+def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, args, log_dir="runs", weight_decay=1e-5, patience=3):
+    num_epochs = args.num_epochs
+    use_wandb=args.use_wandb
+    checkpoint_dir=args.checkpoint_dir
     skip_model_selection = False
     crossvt = args.with_neighbor 
     # 如果真按1k epochs训练效果会更好，但是8分钟才训完一个站，太慢了。
     # if skip_model_selection:
     #     patience = 100000  # magic number: inf
-    criterion = nn.MSELoss()
+    if args.loss == 'mse':
+        criterion = nn.MSELoss()
+    elif args.loss == 'mae':
+        criterion = nn.L1Loss()
+    else:
+        raise NotImplementedError(f"{args.loss} not supported")
+
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=weight_decay)
     # ReduceLROnPlateau scheduler reduces the learning rate when a metric has stopped improving
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
@@ -240,7 +249,7 @@ def main(args):
     model, train_loader, val_loader, test_loader, denormalizer = get_model_and_loader(args, device)
 
     # Train the model
-    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args.num_epochs, use_wandb=args.use_wandb, checkpoint_dir=args.checkpoint_dir)
+    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")
@@ -248,12 +257,11 @@ if __name__ == "__main__":
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for the optimizer")
-    parser.add_argument("--hidden_size", type=int, default=100, help="Hidden size of the LSTM layers")
-    parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
     parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--months", help="months used in training set.")
     parser.add_argument("--plant_set", choices=PLANTS.keys())
+    parser.add_argument("--loss", choices=['mae', 'mse'], default='mse')
     parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
     parser.add_argument("--test", action='store_true')
     args = parser.parse_args()
