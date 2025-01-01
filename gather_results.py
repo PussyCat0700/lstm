@@ -59,7 +59,7 @@ for group_type, group_data in grouped:
                 if df["rmse"][0] >= 0:
                     all_metrics.append(df)
                     if args.zip:
-                        file_paths = [os.path.join(station_path, x) for x in ['all_gts.npy', 'all_preds.npy']]
+                        file_paths = [os.path.join(station_path_original, x) for x in ['all_gts.npy', 'all_preds.npy', 'output.csv']]
                         for file_path in file_paths:
                             if not os.path.isfile(file_path):
                                 continue

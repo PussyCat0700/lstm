@@ -47,12 +47,12 @@ try:
     Y_test_real = Y_test_real.flatten()
     preds_test = np.maximum(preds_test, 0)
     Y_test_real = np.maximum(Y_test_real, 0)
+    png_path = os.path.join(save_path, f"{args.plant_number}.png")
+    plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10)
     all_metrics = compute_all_metrics(preds_test, Y_test_real, denormalizer(1.0))
     print(all_metrics)
     metrics_path = os.path.join(save_path, 'metrics.csv')
     write_csv(metrics_path, all_metrics)
-    png_path = os.path.join(save_path, f"{args.plant_number}.png")
-    plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10)
 except ValueError as e:
     # 检查是否为NaN相关的ValueError
     if "Input contains NaN" in str(e):

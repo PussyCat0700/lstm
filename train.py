@@ -211,6 +211,10 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
     all_outputs = np.maximum(np.concatenate(all_outputs, axis=0).flatten(), 0)
     all_gts = np.maximum(np.concatenate(all_gts, axis=0).flatten(), 0)
     all_y_times = np.concatenate(all_y_times)
+    filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
+    mae, mse = plot_predictions_vs_ground_truth_vanilla(all_outputs, all_gts, filename, all_y_times=all_y_times)
+    print(mae)
+    print(mse)
     all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
     def write_csv():
         csv_filename = os.path.join(checkpoint_dir, 'metrics.csv')
@@ -228,10 +232,6 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             writer.add_scalar(f"{key}/test", metric, len(test_loader))
     test_loss /= len(test_loader)
     print(f"Test Loss (Batched): {test_loss:.4f}")
-    filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    mae, mse = plot_predictions_vs_ground_truth_vanilla(all_outputs, all_gts, filename, all_y_times=all_y_times)
-    print(mae)
-    print(mse)
     if use_wandb:
         wandb.log({"test_mae": mae, "test_mse":mse})
         wandb.log({"final_test_loss": test_loss})
