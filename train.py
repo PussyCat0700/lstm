@@ -270,6 +270,7 @@ if __name__ == "__main__":
     args.num_epochs = 30
     print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
+    args.nwp_input_size = path_loader.nwp_input_size
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     print(f"ckpt: {args.checkpoint_dir}")
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')

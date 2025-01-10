@@ -1,10 +1,10 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from paths import nwp_input_size
 
 
 class WindPowerFFNN(nn.Module):
-    def __init__(self, input_dim=nwp_input_size*48):
+    def __init__(self, nwp_input_size):
+        input_dim = nwp_input_size*48
         super(WindPowerFFNN, self).__init__()
         self.fc = nn.Linear(input_dim, 96)
         self.sigmoid = nn.Sigmoid()
@@ -24,7 +24,8 @@ class WindPowerFFNN(nn.Module):
 
 
 class EnhancedWindPowerNN(nn.Module):
-    def __init__(self, input_dim=nwp_input_size*48):
+    def __init__(self, nwp_input_size):
+        input_dim = nwp_input_size*48
         super(EnhancedWindPowerNN, self).__init__()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 64)

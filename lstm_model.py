@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from paths import nwp_input_size
 
 
 # Hyperparameters
@@ -10,7 +8,7 @@ hidden_size = 100
 
 class BiLSTMWithFusion(nn.Module):
     def __init__(self,
-                 input_dim=nwp_input_size+power_input_size,
+                 input_dim,
                  hidden_dim=hidden_size,
                  num_layers=2,
                  output_dim=1,
@@ -67,7 +65,7 @@ class BiLSTMWithFusion(nn.Module):
 
 class CNNLSTMModel(nn.Module):
     def __init__(self,
-                 input_dim=nwp_input_size,
+                 input_dim,
                  num_layers=2,
                  dropout=0.5):
         super().__init__()
@@ -98,7 +96,7 @@ class CNNLSTMModel(nn.Module):
 
 class BiLSTMNWPOnly(nn.Module):
     def __init__(self,
-                 input_dim=nwp_input_size,
+                 input_dim,
                  hidden_dim=hidden_size,
                  num_layers=2,
                  output_dim=1,

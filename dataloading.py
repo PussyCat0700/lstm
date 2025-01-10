@@ -72,18 +72,26 @@ class PowerPlantDataset(Dataset):
         return start_time
     
     def _get_nwp(self, nwp_time):
-        fixed_times = pd.to_datetime([
-            f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
-            f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
-            f"{nwp_time.strftime('%Y-%m-%d')} 12:00:00",
-            f"{nwp_time.strftime('%Y-%m-%d')} 18:00:00"
-        ])
-        valid_times = [t for t in fixed_times if t <= nwp_time]
-        closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
-        nwp_data = np.load(nwp_file)
-        hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
-        nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
+        if path_loader.is_weather_real:
+            nwp_data = []
+            for hour in range(0, 48):
+                fixed_time = pd.to_datetime(nwp_time + pd.Timedelta(hours=hour))
+                nwp_file = os.path.join(self.nwp_dir, f"{fixed_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
+                nwp_data.append(np.load(nwp_file))
+            nwp_data_trunc = np.concatenate(nwp_data, axis=0).reshape(48, -1)
+        else:
+            fixed_times = pd.to_datetime([
+                f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
+                f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
+                f"{nwp_time.strftime('%Y-%m-%d')} 12:00:00",
+                f"{nwp_time.strftime('%Y-%m-%d')} 18:00:00"
+            ])
+            valid_times = [t for t in fixed_times if t <= nwp_time]
+            closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
+            nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
+            nwp_data = np.load(nwp_file)
+            hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
+            nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
         return nwp_data_trunc
     
     def _get_global_min_max_weather(self):
@@ -417,7 +425,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 if __name__ == '__main__':
     plant_number = 298
-    path_loader.init('12m', 'nmg', plant_number)
+    path_loader.init('12m', 'china', plant_number)
     get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
     train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1)
     for batch in val_loader:

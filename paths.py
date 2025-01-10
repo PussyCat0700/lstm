@@ -7,6 +7,7 @@ PLANTS = {
     "china": './conf/solar/china.yaml',
     "nmg": './conf/solar/nmg.yaml',
     "china_add": './conf/solar/china_add.yaml',
+    "china_real": './conf/solar/china_real.yaml',
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
@@ -74,12 +75,14 @@ class LazyPathLoader:
     def _update_paths(self, paths):
         paths = {key: value.format(plant_number=self.plant_id) for key, value in paths.items()}
         processed_dir = paths["processed_dir"]
+        # special case here: when only weather is different:
+        chn = lambda s: s.replace('_real', '')
         rel_dir = f"{self.plantset}/{self.plant_id}"
         if self.ablation_name is not None:
             rel_dir = f"ablation_{self.plantset}/{self.ablation_name}/{self.plant_id}"
-        paths["train_power_file"] = os.path.join(processed_dir, f"{rel_dir}/train_china_{self.plantset}_solar_history.csv")
-        paths["valid_power_file"] = os.path.join(processed_dir, f"{rel_dir}/valid_china_{self.plantset}_solar_history.csv")
-        paths["test_power_file"] = os.path.join(processed_dir, f"{rel_dir}/test_china_{self.plantset}_solar_history.csv")
+        paths["train_power_file"] = os.path.join(processed_dir, chn(f"{rel_dir}/train_china_{self.plantset}_solar_history.csv"))
+        paths["valid_power_file"] = os.path.join(processed_dir, chn(f"{rel_dir}/valid_china_{self.plantset}_solar_history.csv"))
+        paths["test_power_file"] = os.path.join(processed_dir, chn(f"{rel_dir}/test_china_{self.plantset}_solar_history.csv"))
         paths["nwp_min_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_min.npy")
         paths["nwp_max_file"] = os.path.join(processed_dir, f"{rel_dir}/nwp_max.npy")
         return paths
@@ -106,13 +109,15 @@ class LazyPathLoader:
     @property
     def nwp_input_size(self):
         return self.config['params']['nwp_input_size']
+    
+    @property
+    def is_weather_real(self):
+        return self.config['params']['real_weather']
 
 
 
 # 创建懒加载路径加载器
 path_loader = LazyPathLoader()
-# 不受影响的变量
-nwp_input_size = 27
 
 class BaseSavePath:
     def __str__(self) -> str:

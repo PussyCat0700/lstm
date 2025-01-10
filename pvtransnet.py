@@ -1,10 +1,9 @@
 from crossvivit_model import Transformer
 import torch.nn as nn
-from paths import nwp_input_size
 
 
 class PVTransNetE(nn.Module):
-    def __init__(self):
+    def __init__(self, nwp_input_size):
         super().__init__()
         dim = 128
         self.num_mlp_heads = 2

@@ -24,28 +24,28 @@ def get_model_and_loader(args, device):
         # Get data loaders
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
         # Initialize model, criterion, and optimizer
-        model = BiLSTMNWPOnly().to(device)
+        model = BiLSTMNWPOnly(args.nwp_input_size).to(device)
     elif args.model_type == CNN_LSTM:
         # Get data loaders
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
         # Initialize model, criterion, and optimizer
-        model = CNNLSTMModel().to(device)
+        model = CNNLSTMModel(args.nwp_input_size).to(device)
     elif args.model_type == FFNN:
         # Get data loaders
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
         # Initialize model, criterion, and optimizer
-        model = WindPowerFFNN().to(device)
+        model = WindPowerFFNN(args.nwp_input_size).to(device)
     elif args.model_type == GPNN:
         # Get data loaders
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
         # Initialize model, criterion, and optimizer
-        model = EnhancedWindPowerNN().to(device)
+        model = EnhancedWindPowerNN(args.nwp_input_size).to(device)
     elif args.model_type == CROSS_VIVIT:
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
-        model = RoCrossViViT().to(device)
+        model = RoCrossViViT(ctx_channels=args.nwp_input_size).to(device)
     elif args.model_type == PVTRANS_E:
         train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
-        model = PVTransNetE().to(device)
+        model = PVTransNetE(args.nwp_input_size).to(device)
     return model, train_loader, val_loader, test_loader, denormalizer
 
 
