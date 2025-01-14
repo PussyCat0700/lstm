@@ -98,20 +98,32 @@ class PowerPlantDataset(Dataset):
         weather_data_dir = self.nwp_dir
         if (not os.path.exists(self.nwp_max_file)) or (not os.path.join(self.nwp_min_file)): 
             print('doing nwp minmax')
-            # 初始化最大值和最小值矩阵
-
-            for file_path in os.listdir(weather_data_dir):
+            nan_count = 0
+            valid_count = 0
+            global_min = global_max = global_sum = None
+            for x in os.listdir(weather_data_dir):
                 # 加载当前.npy文件
-                data = np.load(os.path.join(weather_data_dir, file_path))
-                global_min = global_max = None
+                file_path = os.path.join(weather_data_dir, x)
+                data = np.load(file_path)
                 if global_max is None:
                     global_max = np.full((data.shape[-1]), -np.inf)
                 if global_min is None:
                     global_min = np.full((data.shape[-1]), np.inf)
+                if global_sum is None:
+                    global_sum = np.full((data.shape[-1]), .0)
                 # 计算每个变量的最小值和最大值
                 local_max = np.max(data, axis=tuple(range(data.ndim - 1)))
                 local_min = np.min(data, axis=tuple(range(data.ndim - 1)))
-                
+                local_avg = np.average(data, axis=tuple(range(data.ndim - 1)))
+                if np.isnan(local_max).any() or np.isnan(local_min).any():
+                    nan_count += 1
+                    fill_value = global_sum / (valid_count+valid_count)
+                    data[np.isnan(data)] = fill_value[np.isnan(data)]
+                    np.save(file_path, data)
+                    continue
+                else:
+                    global_sum += local_avg
+                    valid_count += 1
                 # 更新全局最大值和最小值
                 global_max = np.maximum(global_max, local_max)
                 global_min = np.minimum(global_min, local_min)
