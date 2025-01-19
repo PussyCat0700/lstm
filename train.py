@@ -268,13 +268,13 @@ if __name__ == "__main__":
     args.model_type = model_type_dict[args.model_type]
     args.with_neighbor = args.model_type == CROSS_VIVIT
     args.num_epochs = 30
-    print(f'now training {args.model_type}')
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
     args.nwp_input_size = path_loader.nwp_input_size
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
-    print(f"ckpt: {args.checkpoint_dir}")
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
     with open(logger_file, 'w') as sys.stdout:
+        print(f'now training {args.model_type}')
+        print(f"ckpt: {args.checkpoint_dir}")
         if not path_loader.check_exists():
             print(f"{args.plant_number} does not have source input file")
             exit(0)
