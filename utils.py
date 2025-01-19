@@ -1,16 +1,16 @@
 import csv
 import numpy as np
-from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, LSTM, PVTRANS_E, RANDOM_FOREST, XGBOOST, XGBOOST_DR_PU, sklearn_model_type_dict
+from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, PVTRANS_E, RANDOM_FOREST, XGBOOST, XGBOOST_DR_PU, sklearn_model_type_dict
 from dataloading import get_data_loaders_and_denormalizer
 from pvtransnet import PVTransNetE
-from lstm_model import BiLSTMNWPOnly, CNNLSTMModel
+from lstm_model import CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
 import xgboost as xgb
 from lightgbm import LGBMRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.ensemble import GradientBoostingRegressor, ExtraTreesRegressor, RandomForestRegressor
 from crossvivit_model import RoCrossViViT
-from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
+from metrics import CR, MAE, compute_gte, compute_pte
 
 
 def get_parameter_number(model):
@@ -20,31 +20,26 @@ def get_parameter_number(model):
 
 
 def get_model_and_loader(args, device):
-    if args.model_type == LSTM:
+    if args.model_type == CNN_LSTM:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
-        # Initialize model, criterion, and optimizer
-        model = BiLSTMNWPOnly(args.nwp_input_size).to(device)
-    elif args.model_type == CNN_LSTM:
-        # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
         # Initialize model, criterion, and optimizer
         model = CNNLSTMModel(args.nwp_input_size).to(device)
     elif args.model_type == FFNN:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
         # Initialize model, criterion, and optimizer
         model = WindPowerFFNN(args.nwp_input_size).to(device)
     elif args.model_type == GPNN:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
         # Initialize model, criterion, and optimizer
         model = EnhancedWindPowerNN(args.nwp_input_size).to(device)
     elif args.model_type == CROSS_VIVIT:
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
         model = RoCrossViViT(ctx_channels=args.nwp_input_size).to(device)
     elif args.model_type == PVTRANS_E:
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size)
         model = PVTransNetE(args.nwp_input_size).to(device)
     return model, train_loader, val_loader, test_loader, denormalizer
 

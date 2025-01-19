@@ -25,7 +25,7 @@ def get_time_pe(start_time:pd.Timestamp, periods, freq):
 
 
 class PowerPlantDataset(Dataset):
-    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
+    def __init__(self, split, plant_number, power_minmax=None):
         """
         Args:
             csv_file (string): Path to the CSV file with power generation data.
@@ -53,7 +53,6 @@ class PowerPlantDataset(Dataset):
             self.power_minmax = power_minmax
         self.power_min = self.power_minmax[0]
         self.power_max = self.power_minmax[1]
-        self.with_extra_span = with_extra_span
         # Fit the weather scaler based on all weather data from all farms
         self.init_weather_minmax()
         print('done doing weather.')
@@ -164,14 +163,9 @@ class PowerPlantDataset(Dataset):
         X_norm = self.normalize_power_data(X)
         
         # Next day data
-        if self.with_extra_span:
-            # total span: 63+96=159
-            next_start_time = start_time + pd.DateOffset(days=1)  # day1 start 08:15:00
-            next_end_time = next_start_time + pd.DateOffset(hours=15, minutes=45) + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
-        else:
-            # total span: 96
-            next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
-            next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
+        # total span: 96
+        next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
+        next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
         Y_norm = self.normalize_power_data(Y)
 
@@ -207,8 +201,8 @@ class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
     grid = torch.Tensor(np.array([[(x, y) for y in np.arange(54, 2.75, -0.25)] for x in np.arange(73, 136.25, 0.25)]))
     
     
-    def __init__(self, split, plant_number, power_minmax=None, with_extra_span=True):
-        super().__init__(split, plant_number, power_minmax, with_extra_span)
+    def __init__(self, split, plant_number, power_minmax=None):
+        super().__init__(split, plant_number, power_minmax)
         self.coords = np.load(path_loader.paths['source_coords_file'])
     
     def get_coords_neighbors(self):
@@ -395,11 +389,11 @@ def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
     data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
     return data, dataset.denormalize_power_data
 
-def get_data_loaders_and_denormalizer(plant_number, batch_size, with_extra_span:bool=True):
-    train_dataset = PowerPlantHourlyDataset("train", plant_number, with_extra_span=with_extra_span)
+def get_data_loaders_and_denormalizer(plant_number, batch_size):
+    train_dataset = PowerPlantHourlyDataset("train", plant_number)
     power_minmax = train_dataset.power_minmax
-    valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax, with_extra_span=False)
-    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax, with_extra_span=False)
+    valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax)
+    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, shuffle=True)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
