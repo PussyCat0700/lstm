@@ -1,3 +1,4 @@
+import math
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
@@ -264,6 +265,85 @@ class PowerPlantHourlyDataset(PowerPlantDataset):
         return start_time
 
 
+class PowerPlantShortTermDataset(PowerPlantDataset):
+    def __init__(self, split, plant_number, pred_span, power_minmax=None):
+        super().__init__(split, plant_number, power_minmax)
+        self.pred_span = pred_span
+
+    def __getitem__(self, idx):
+        """
+        1. csv不需要倒时差
+        - 历史数据起始 终止
+        day0					day1
+        08:15:00【含】-> +96 08:00:00【含】
+        - 预测数据起始 终止
+        day1					day1
+        +96 08:15:00【含】-> +self.pred_span小时，如1小时就是09:00:00【含】
+        评估：
+        2. nwp的时差
+        08:00:00->00:00:00 -8h
+        """
+        # Current day data
+        start_time = self._get_start_time(idx)  # day0
+        end_time = start_time + pd.DateOffset(hours=23, minutes=45)  # day1
+        X = self.data.loc[start_time:end_time].iloc[:, 0].values
+        X_norm = self.normalize_power_data(X)
+        
+        # Next day data
+        # total span: 96
+        next_start_time = end_time + pd.DateOffset(minutes=15)  # starting from 08:15:00
+        next_end_time = end_time + pd.DateOffset(hours=self.pred_span)  # ending
+        Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
+        Y_norm = self.normalize_power_data(Y)
+
+        # Load the corresponding NWP data
+        nwp_time = end_time - pd.DateOffset(hours=8)
+        nwp_data = self._get_nwp(nwp_time)
+        range_values = self.station_nwp_max - self.station_nwp_min
+        nwp_data_scaled = np.zeros_like(nwp_data)
+        epsilon = 1e-10
+        for i in range(nwp_data.shape[-1]):
+            if abs(range_values[i]) < epsilon:  # 判断是否接近于0
+                nwp_data_scaled[..., i] = 1  # 归一化为常数1
+            else:
+                nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
+        time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
+        time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
+        time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        return {
+            KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
+            KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
+            KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
+            KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
+            KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
+            KEY_TIME_NWP_PE: time_nwp_pe,
+            KEY_TIME_X_PE: time_x_pe,
+            KEY_TIME_X: time_x,
+            KEY_TIME_Y: time_y,
+        }
+
+
+class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDataset):
+    def __len__(self):
+        return math.floor((len(self.data) // 4 - 24) / self.pred_span)
+    
+    def _get_start_time(self, idx):
+        offset = 1  # hh:15:00
+        start_time = self.data.index[idx*4*self.pred_span+offset].replace(second=0, microsecond=0)
+        return start_time
+
+
+class PowerPlantShortTermHourlyDataset(PowerPlantShortTermDataset):
+    def __len__(self):
+        return len(self.data) // 4 - 24
+    
+    def _get_start_time(self, idx):
+        offset = 1  # hh:15:00
+        start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
+        return start_time
+
+
 class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
     """小时对小时的数据集
     当前整点数据对应40小时后的整点数据
@@ -385,15 +465,22 @@ def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
     }
 
 def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
+    # TODO replace 40 hrs span
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number)
     data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
     return data, dataset.denormalize_power_data
 
-def get_data_loaders_and_denormalizer(plant_number, batch_size):
-    train_dataset = PowerPlantHourlyDataset("train", plant_number)
-    power_minmax = train_dataset.power_minmax
-    valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax)
-    test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
+def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
+    if period > 24:
+        train_dataset = PowerPlantHourlyDataset("train", plant_number)
+        power_minmax = train_dataset.power_minmax
+        valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax)
+        test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
+    else:
+        train_dataset = PowerPlantShortTermHourlyDataset("train", plant_number, period)
+        power_minmax = train_dataset.power_minmax
+        valid_dataset = PowerPlantShortTermHourlyDataset("valid", plant_number, period, power_minmax)
+        test_dataset = PowerPlantShortTermPeriodlyDataset("test", plant_number, period, power_minmax)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, shuffle=True)
     val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
@@ -432,7 +519,8 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 if __name__ == '__main__':
     plant_number = 298
     path_loader.init('12m', 'china', plant_number)
-    get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
-    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1)
-    for batch in val_loader:
-        print(batch)
+    # TODO test here
+    # get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
+    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1, 24)
+    for batch in test_loader:
+        print(batch[KEY_TIME_X], batch[KEY_TIME_Y])
