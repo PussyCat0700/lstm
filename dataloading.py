@@ -270,6 +270,13 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
     def __init__(self, split, plant_number, pred_span, power_minmax=None):
         super().__init__(split, plant_number, power_minmax)
         self.pred_span = pred_span
+    
+    def _could_pad_len(self, idx, x):
+        if len(x) < 96:
+            pad_len = 96 - len(x)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len}')
+            x = np.pad(x, (0, pad_len), mode='constant', constant_values=0) # pad to 96 with 0.
+        return x
 
     def __getitem__(self, idx):
         """
@@ -295,10 +302,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         next_start_time = end_time + pd.DateOffset(minutes=15)  # starting from 08:15:00
         next_end_time = end_time + pd.DateOffset(hours=self.pred_span)  # ending
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
-        if len(Y) < 96:
-            pad_len = 96 - len(Y)
-            print(f'padding {idx}th sample in {self.split}. length is {pad_len}')
-            Y = np.pad(Y, (0, pad_len), mode='constant', constant_values=0) # pad to 96 with 0.
+        Y = self._could_pad_len(idx, Y)
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
@@ -315,7 +319,8 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
         time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
-        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
+        time_y = self._could_pad_len(idx, time_y).tolist()
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
