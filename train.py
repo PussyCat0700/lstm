@@ -22,7 +22,7 @@ from pytorch_lightning import seed_everything
 seed_everything(42)
 
 
-def train_model(device, model, train_loader, val_loader, test_loader, denormalizer, args, log_dir="runs", weight_decay=1e-5, patience=3):
+def train_model(device, model, train_loader, val_loader, test_loaders, denormalizer, args, log_dir="runs", weight_decay=1e-5, patience=3):
     num_epochs = args.num_epochs
     use_wandb=args.use_wandb
     checkpoint_dir=args.checkpoint_dir
@@ -76,7 +76,7 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         start_epoch, best_val_loss = load_checkpoint(latest_checkpoint, model, optimizer)
     else:
         print("No checkpoint found, starting from scratch.")
-    def forward_model(batch, training:bool):
+    def forward_model(batch, training:bool, period_hours:int=96):
         REAL_Y = batch[KEY_REAL_Y].to(device)
         nwp_data = batch[KEY_NORM_NWP].to(device)
         if crossvt:
@@ -98,6 +98,9 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
         else:
             outputs = model(nwp_data)
         outputs_denormalized = denormalizer(outputs)
+        len_output = outputs_denormalized.shape[-1]
+        if period_hours < len_output:
+            outputs_denormalized = outputs_denormalized[..., :period_hours]
         loss = criterion(outputs_denormalized, REAL_Y)
         return loss, outputs_denormalized
     # Training loop
@@ -186,70 +189,76 @@ def train_model(device, model, train_loader, val_loader, test_loader, denormaliz
             best_epoch, _ = load_checkpoint(latest_checkpoint, model, optimizer)
     else:
         best_epoch = start_epoch
+    test_model(device, model, forward_model, writer, test_loaders, denormalizer, args, best_epoch)    
+        
+    return model
 
+def test_model(device, model, forward_model, writer, test_loaders, denormalizer, args, best_epoch):
+    use_wandb = False
     print(f'testing on epoch {best_epoch}')
     # Testing loop
     model.eval()
-    test_loss = 0.0
-    all_outputs = []
-    all_gts = []
-    all_y_times = []
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(test_loader):
-            REAL_Y = batch[KEY_REAL_Y].to(device)
-            TIME_Y = batch[KEY_TIME_Y]
-            TIME_Y = np.array(TIME_Y).T.flatten()  # tackle the mysterious way torch dataloader handles list of string.
-            all_y_times.append(TIME_Y)
-            loss, outputs = forward_model(batch, False)
-            test_loss += loss
-            all_outputs.append(outputs.detach().cpu().numpy())
-            all_gts.append(REAL_Y.detach().cpu().numpy())
+    for period, test_loader in test_loaders.items():
+        print(f"{period=}")
+        test_loss = 0.0
+        all_outputs = []
+        all_gts = []
+        all_y_times = []
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(test_loader):
+                REAL_Y = batch[KEY_REAL_Y].to(device)
+                TIME_Y = batch[KEY_TIME_Y]
+                TIME_Y = np.array(TIME_Y).T.flatten()  # tackle the mysterious way torch dataloader handles list of string.
+                all_y_times.append(TIME_Y)
+                loss, outputs = forward_model(batch, False, period_hours=period*4)
+                test_loss += loss
+                all_outputs.append(outputs.detach().cpu().numpy())
+                all_gts.append(REAL_Y.detach().cpu().numpy())
+                if use_wandb:
+                    wandb.log({"test_loss": loss.item()})
+                else:
+                    writer.add_scalar("Loss/test", loss.item(), batch_idx)
+        all_outputs = np.maximum(np.concatenate(all_outputs, axis=0).flatten(), 0)
+        all_gts = np.maximum(np.concatenate(all_gts, axis=0).flatten(), 0)
+        all_y_times = np.concatenate(all_y_times)
+        filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}_{period}h.png")
+        mae, mse = plot_predictions_vs_ground_truth_vanilla(all_outputs, all_gts, filename, all_y_times=all_y_times)
+        print(mae)
+        print(mse)
+        all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
+        def write_csv():
+            csv_filename = os.path.join(args.checkpoint_dir, f'metrics_{period}h.csv')
+            with open(csv_filename, mode='w', newline='') as file:
+                csv_writer = csv.writer(file)
+                # 写入表头（字典的键）
+                csv_writer.writerow(all_metrics.keys())
+                # 写入内容（字典的值）
+                csv_writer.writerow(all_metrics.values())
+        write_csv()
+        for key, metric in all_metrics.items():
             if use_wandb:
-                wandb.log({"test_loss": loss.item()})
+                wandb.log({f"test_{key}": metric})
             else:
-                writer.add_scalar("Loss/test", loss.item(), batch_idx)
-    all_outputs = np.maximum(np.concatenate(all_outputs, axis=0).flatten(), 0)
-    all_gts = np.maximum(np.concatenate(all_gts, axis=0).flatten(), 0)
-    all_y_times = np.concatenate(all_y_times)
-    filename = os.path.join(args.checkpoint_dir, f"{args.plant_number}.png")
-    mae, mse = plot_predictions_vs_ground_truth_vanilla(all_outputs, all_gts, filename, all_y_times=all_y_times)
-    print(mae)
-    print(mse)
-    all_metrics = compute_all_metrics(all_outputs, all_gts, denormalizer(1.0))
-    def write_csv():
-        csv_filename = os.path.join(checkpoint_dir, 'metrics.csv')
-        with open(csv_filename, mode='w', newline='') as file:
-            csv_writer = csv.writer(file)
-            # 写入表头（字典的键）
-            csv_writer.writerow(all_metrics.keys())
-            # 写入内容（字典的值）
-            csv_writer.writerow(all_metrics.values())
-    write_csv()
-    for key, metric in all_metrics.items():
+                writer.add_scalar(f"{key}/test", metric, len(test_loader))
+        test_loss /= len(test_loader)
+        print(f"Test Loss (Batched): {test_loss:.4f}")
         if use_wandb:
-            wandb.log({f"test_{key}": metric})
+            wandb.log({"test_mae": mae, "test_mse":mse})
+            wandb.log({"final_test_loss": test_loss})
+            wandb.log({"best_epoch": best_epoch})
+            wandb.finish()
         else:
-            writer.add_scalar(f"{key}/test", metric, len(test_loader))
-    test_loss /= len(test_loader)
-    print(f"Test Loss (Batched): {test_loss:.4f}")
-    if use_wandb:
-        wandb.log({"test_mae": mae, "test_mse":mse})
-        wandb.log({"final_test_loss": test_loss})
-        wandb.log({"best_epoch": best_epoch})
-        wandb.finish()
-    else:
-        writer.close()
-    
-    return model
+            writer.close()
+    print("end of evaluation")
 
 def main(args):
     # Set up device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model, train_loader, val_loader, test_loader, denormalizer = get_model_and_loader(args, device)
+    model, train_loader, val_loader, test_loaders, denormalizer = get_model_and_loader(args, device)
 
     # Train the model
-    train_model(0, model, train_loader, val_loader, test_loader, denormalizer, args)
+    train_model(0, model, train_loader, val_loader, test_loaders, denormalizer, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BiLSTM model for power forecasting")

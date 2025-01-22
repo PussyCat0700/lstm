@@ -482,22 +482,28 @@ def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
     return data, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
+    test_loaders = {}
     if period > 24:
         train_dataset = PowerPlantHourlyDataset("train", plant_number)
         power_minmax = train_dataset.power_minmax
         valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax)
         test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
+        test_loaders = {40: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False)}
     else:
+        # We only consider when period=24 for the moment
         train_dataset = PowerPlantShortTermHourlyDataset("train", plant_number, period)
         power_minmax = train_dataset.power_minmax
         valid_dataset = PowerPlantShortTermHourlyDataset("valid", plant_number, period, power_minmax)
-        test_dataset = PowerPlantShortTermPeriodlyDataset("test", plant_number, period, power_minmax)
+        for period in [24, 4, 1]:
+            test_dataset = PowerPlantShortTermPeriodlyDataset("test", plant_number, period, power_minmax)
+            test_loaders.update({
+                period: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False),
+            })
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, shuffle=True)
-    val_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(valid_dataset, batch_size=batch_size, num_workers=1, shuffle=False)
 
-    return train_loader, val_loader, test_loader, train_dataset.denormalize_power_data
+    return train_loader, val_loader, test_loaders, train_dataset.denormalize_power_data
 
 
 def save_checkpoint(state, filename):
@@ -533,10 +539,10 @@ if __name__ == '__main__':
     path_loader.init('12m', 'china', plant_number)
     # TODO test here
     # get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
-    for period in [24, 4, 1]:
+    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
+    for period, test_loader in test_loaders.items(): 
         outlen = period*4
         print(f"testing {period=}")
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, period)
         for i, batch in enumerate(test_loader):
             assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
         print(batch[KEY_TIME_X][-1], batch[KEY_TIME_Y][-1])

@@ -19,14 +19,18 @@ def plot_predictions_vs_ground_truth_vanilla(all_preds, all_gts, filename, days=
     plt.legend()
     plt.savefig(filename)
     dir_name = os.path.dirname(filename)
+    postfix = ''
+    filenameparts = os.path.basename(filename.split('.')[0]).split('_')
+    if len(filenameparts) > 1:
+        postfix = '_'+'_'.join(filenameparts[1:])
     if all_y_times is None:
-        np.save(os.path.join(dir_name, 'all_preds.npy'), all_preds)
-        np.save(os.path.join(dir_name, 'all_gts.npy'), all_gts)
+        np.save(os.path.join(dir_name, f'all_preds{postfix}.npy'), all_preds)
+        np.save(os.path.join(dir_name, f'all_gts{postfix}.npy'), all_gts)
     else:
         df = pd.DataFrame({
             'Datetime': all_y_times,
             'Predictions': all_preds,
             'Ground Truth': all_gts
         })
-        df.to_csv(os.path.join(dir_name, 'output.csv'), index=False)
+        df.to_csv(os.path.join(dir_name, f'output{postfix}.csv'), index=False)
     return mae, mse
