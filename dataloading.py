@@ -270,12 +270,13 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
     def __init__(self, split, plant_number, pred_span, power_minmax=None):
         super().__init__(split, plant_number, power_minmax)
         self.pred_span = pred_span
+        self.outlen = pred_span*4
     
-    def _could_pad_len(self, idx, x):
-        if len(x) < 96:
-            pad_len = 96 - len(x)
-            print(f'padding {idx}th sample in {self.split}. length is {pad_len}')
-            x = np.pad(x, (0, pad_len), mode='constant', constant_values=0) # pad to 96 with 0.
+    def _could_pad_len(self, idx, x, pad_value=0):
+        if len(x) < self.outlen:
+            pad_len = self.outlen - len(x)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
+            x = np.pad(x, (0, pad_len), mode='constant', constant_values=pad_value)
         return x
 
     def __getitem__(self, idx):
@@ -320,7 +321,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
-        time_y = self._could_pad_len(idx, time_y).tolist()
+        time_y = self._could_pad_len(idx, time_y, None).tolist()
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
@@ -528,9 +529,14 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 if __name__ == '__main__':
     plant_number = 298
+    bs = 2
     path_loader.init('12m', 'china', plant_number)
     # TODO test here
     # get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
-    train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1, 24)
-    for i, batch in enumerate(test_loader):
-        assert len(batch[KEY_NORM_X][0]) == 96 and len(batch[KEY_NORM_Y][0]) == 96, i
+    for period in [24, 4, 1]:
+        outlen = period*4
+        print(f"testing {period=}")
+        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, period)
+        for i, batch in enumerate(test_loader):
+            assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
+        print(batch[KEY_TIME_X][-1], batch[KEY_TIME_Y][-1])
