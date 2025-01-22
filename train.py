@@ -264,16 +264,19 @@ if __name__ == "__main__":
     parser.add_argument("--loss", choices=['mae', 'mse'], default='mse')
     parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
     parser.add_argument("--test", action='store_true')
+    parser.add_argument("--period", type=int, default=24)
     args = parser.parse_args()
     args.model_type = model_type_dict[args.model_type]
     args.with_neighbor = args.model_type == CROSS_VIVIT
     args.num_epochs = 30
-    path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type)
+    path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type, args.period)
     args.nwp_input_size = path_loader.nwp_input_size
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
     with open(logger_file, 'w') as sys.stdout:
         print(f'now training {args.model_type}')
+        if args.period:
+            print(f"{args.period=}")
         print(f"ckpt: {args.checkpoint_dir}")
         if not path_loader.check_exists():
             print(f"{args.plant_number} does not have source input file")

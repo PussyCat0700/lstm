@@ -33,7 +33,8 @@ class LazyPathLoader:
         self.plant_number = None
         self.plantnumdict = {}
     
-    def init(self, months, plantset, plant_number, type_value=None):
+    def init(self, months, plantset, plant_number, type_value=None, period: int=None):
+        self.period = period
         self.plant_number = plant_number
         self.plantset = plantset
         self.type_value = type_value
@@ -99,11 +100,18 @@ class LazyPathLoader:
             runpath, is it over with metrics.csv.
         """
         midname = f"runs_{modelname}"
+        if self.period:
+            midname += f'_{self.period}'
         if self.ablation_name is not None:
             midname = f"ablation_{modelname}/{self.ablation_name}"
+            if self.period:
+                midname += f'_{self.period}'
         runpath = f"{self.paths['results_save_path']}/{midname}/{modelname}_{self.plant_id}"
         os.makedirs(runpath, exist_ok=True)
-        metric_dir = os.path.join(runpath, 'metrics.csv')
+        metric_filename = 'metrics.csv'
+        if self.period:
+            metric_filename = f'metric_{self.period}.csv'
+        metric_dir = os.path.join(runpath, metric_filename)
         return runpath, os.path.exists(metric_dir)
 
     @property

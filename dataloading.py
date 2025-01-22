@@ -41,6 +41,7 @@ class PowerPlantDataset(Dataset):
             csv_file = path_loader.paths['valid_power_file']
         elif split == "test":
             csv_file = path_loader.paths['test_power_file']
+        self.split = split
         self.data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
         self.nwp_dir = path_loader.paths['source_nwp_dir']
         self.nwp_max_file = path_loader.paths['nwp_max_file']
@@ -294,6 +295,10 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         next_start_time = end_time + pd.DateOffset(minutes=15)  # starting from 08:15:00
         next_end_time = end_time + pd.DateOffset(hours=self.pred_span)  # ending
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
+        if len(Y) < 96:
+            pad_len = 96 - len(Y)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len}')
+            Y = np.pad(Y, (0, pad_len), mode='constant', constant_values=0) # pad to 96 with 0.
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
@@ -336,7 +341,7 @@ class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDataset):
 
 class PowerPlantShortTermHourlyDataset(PowerPlantShortTermDataset):
     def __len__(self):
-        return len(self.data) // 4 - 24
+        return len(self.data) // 4 - 24 - 24  # extra 24 evading 1800 offset
     
     def _get_start_time(self, idx):
         offset = 1  # hh:15:00
@@ -522,5 +527,5 @@ if __name__ == '__main__':
     # TODO test here
     # get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
     train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(plant_number, 1, 24)
-    for batch in test_loader:
-        print(batch[KEY_TIME_X], batch[KEY_TIME_Y])
+    for i, batch in enumerate(test_loader):
+        assert len(batch[KEY_NORM_X][0]) == 96 and len(batch[KEY_NORM_Y][0]) == 96, i
