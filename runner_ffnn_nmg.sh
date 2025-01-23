@@ -24,6 +24,7 @@ do
     plant_number=$((task_id + i))
     echo "Running task for plant_number: $plant_number"
     logdir=/data1/yfliu/logs/solar/nmg/ffnn/${1}_${task_id}_${plant_number}
+    echo "exporting to logdir $logdir/log.txt"
     mkdir -p $logdir
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set nmg --plant_number $plant_number --months $1 --batch_size 1024 --period 24 > "$logdir/log.txt" 2>&1 &
 done
