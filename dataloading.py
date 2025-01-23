@@ -359,6 +359,10 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
     """小时对小时的数据集
     当前整点数据对应40小时后的整点数据
     """
+    def __init__(self, split, plant_number, pred_span=40, power_minmax=None):
+        super().__init__(split, plant_number, power_minmax)
+        self.pred_span = pred_span
+    
     def __len__(self):
         return len(self.data) // 4 - ((8+6)+16+24)  # Hourly
     
@@ -371,11 +375,11 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         """
         1. csv不需要倒时差
         - 当前时间day0 08:00:00-08:45:00
-        - 预测目标day2 00:00:00-00:45:00
+        - 预测目标day2 00:00:00-00:45:00 (in 40h scenario)
         评估：
         2. nwp的时差
         08:00:00->00:00:00 -8h
-        3. nwp到csv预测值需要偏移：40h
+        3. nwp到csv预测值需要偏移：40h (by default)
         
         returns:
         X_norm/Y_norm: a single digit
@@ -388,7 +392,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         X_norm = self.normalize_power_data(X)
         
         # Next day data
-        y_start_time = x_start_time + pd.DateOffset(hours=40)
+        y_start_time = x_start_time + pd.DateOffset(hours=self.pred_span)
         y_end_time = y_start_time + pd.DateOffset(minutes=45)
         Y = self.data.loc[y_start_time:y_end_time].iloc[:, 0].values
         Y_norm = self.normalize_power_data(Y)
@@ -404,7 +408,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        nwp_data_scaled = nwp_data_scaled[40-1]  # only nwp_input_dim is left
+        nwp_data_scaled = nwp_data_scaled[self.pred_span-1]  # only nwp_input_dim is left
 
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
@@ -417,18 +421,18 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
 
 import csv
 
-def convert_torch_dataset_to_csv(dataset, folder_path):
+def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
     # 创建文件夹（如果不存在）
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
     # 定义保存的文件路径
-    X_file = os.path.join(folder_path, "X_norm.csv")
-    Y_file = os.path.join(folder_path, "Y_norm.csv")
-    X_file_real = os.path.join(folder_path, "X_real.csv")
-    Y_file_real = os.path.join(folder_path, "Y_real.csv")
-    nwp_file = os.path.join(folder_path, "nwp_data_scaled.csv")
-    ready_sign_path = os.path.join(folder_path, "READY")
+    X_file = os.path.join(folder_path, f"X_norm{postfix}.csv")
+    Y_file = os.path.join(folder_path, f"Y_norm{postfix}.csv")
+    X_file_real = os.path.join(folder_path, f"X_real{postfix}.csv")
+    Y_file_real = os.path.join(folder_path, f"Y_real{postfix}.csv")
+    nwp_file = os.path.join(folder_path, f"nwp_data_scaled{postfix}.csv")
+    ready_sign_path = os.path.join(folder_path, f"READY{postfix}")
     if not os.path.exists(ready_sign_path):
         print(f"Saving dataset to CSV in {folder_path}...")
 
@@ -475,10 +479,12 @@ def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
         KEY_NORM_NWP: nwp,
     }
 
-def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path):
-    # TODO replace 40 hrs span
-    dataset = PowerPlantSklearnHourlyDataset(split, plant_number)
-    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split))
+def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int):
+    dataset = PowerPlantSklearnHourlyDataset(split, plant_number, period)
+    postfix = ""
+    if period <= 24:
+        postfix = f"_{period}h"
+    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix)
     return data, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
@@ -494,7 +500,7 @@ def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
         train_dataset = PowerPlantShortTermHourlyDataset("train", plant_number, period)
         power_minmax = train_dataset.power_minmax
         valid_dataset = PowerPlantShortTermHourlyDataset("valid", plant_number, period, power_minmax)
-        for period in [24, 4, 1]:
+        for period in [1, 4, 24]:
             test_dataset = PowerPlantShortTermPeriodlyDataset("test", plant_number, period, power_minmax)
             test_loaders.update({
                 period: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False),
@@ -537,8 +543,10 @@ if __name__ == '__main__':
     plant_number = 298
     bs = 2
     path_loader.init('12m', 'china', plant_number)
-    # TODO test here
-    # get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here")
+    for period in [1, 4, 24, 40]:
+        print(f'{period=}')
+        data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
+        print(data['norm_y'])
     train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
     for period, test_loader in test_loaders.items(): 
         outlen = period*4
