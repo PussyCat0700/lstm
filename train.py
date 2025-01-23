@@ -78,9 +78,10 @@ def train_model(device, model, train_loader, val_loader, test_loaders, denormali
         print("No checkpoint found, starting from scratch.")
     def forward_model(batch, training:bool, period_hours:int=96):
         REAL_Y = batch[KEY_REAL_Y].to(device)
-        nwp_data = batch[KEY_NORM_NWP].to(device)
+        nwp_data = batch[KEY_NORM_NWP].to(device)  # [B, T, Cn]
+        history_x = batch[KEY_NORM_X].to(device).unsqueeze(-1)  # [B, T, C]
+        sst = args.period <= 24
         if crossvt:
-            history_x = batch[KEY_NORM_X].to(device).unsqueeze(-1)  # [B, T, C]
             coords_x = batch[KEY_TS_COORDS].to(device)  # [B, 2, 1, 1]
             coords_nwp = batch[KEY_CTX_COORDS].to(device)  # [B, 2, H, W]
             time_coords_ctx = batch[KEY_TIME_NWP_PE].to(device)  # [B, T, C, H, W]
@@ -96,7 +97,11 @@ def train_model(device, model, train_loader, val_loader, test_loaders, denormali
             )
             outputs = outputs[0]
         else:
-            outputs = model(nwp_data)
+            if sst:
+                outputs = model(nwp_data, history_x)
+            else:
+                # For the moment 40h does not require history data...
+                outputs = model(nwp_data)
         outputs_denormalized = denormalizer(outputs)
         len_output = outputs_denormalized.shape[-1]
         if period_hours < len_output:

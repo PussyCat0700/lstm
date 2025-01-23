@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH --account=yfliu3
-#SBATCH --job-name=pvtrans_e_china_solar
+#SBATCH --job-name=pvtrans_e_china
 #SBATCH --partition=RTX3090,RTX4090,A100,ADA6000
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
-#SBATCH --array=287-398:16%1       # 任务ID范围
+#SBATCH --array=0-398:16%1       # 任务ID范围
 #SBATCH --mem=40GB
 #SBATCH --qos=ne_ablation
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
@@ -25,6 +25,6 @@ do
     echo "Running task for plant_number: $plant_number"
     logdir=/data1/yfliu/logs/solar/china/pvtrans_e/${1}_${task_id}_${plant_number}
     mkdir -p $logdir
-    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 5 --plant_set china --plant_number $plant_number --months $1 --batch_size 128 --plant_type 1 > "$logdir/log.txt" 2>&1 &
+    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 5 --plant_set china --plant_number $plant_number --months $1 --batch_size 128 --period 24 > "$logdir/log.txt" 2>&1 &
 done
 wait

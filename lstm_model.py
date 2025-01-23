@@ -65,10 +65,15 @@ class BiLSTMWithFusion(nn.Module):
 
 class CNNLSTMModel(nn.Module):
     def __init__(self,
-                 input_dim,
+                 input_dim:int,
+                 with_px:bool=False,
                  num_layers=2,
                  dropout=0.5):
         super().__init__()
+        self.with_px = with_px
+        if with_px:
+            self.px_proj = nn.Linear(96, 48)
+            input_dim+=1
         self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool1d(kernel_size=2)  # 池化层
@@ -77,9 +82,13 @@ class CNNLSTMModel(nn.Module):
         self.fc1 = nn.Linear(hidden_size * 24, 256)  # 修改线性层输入大小
         self.fc2 = nn.Linear(256, 96)
 
-    def forward(self, x):
+    def forward(self, x, px=None):
         # x.shape: (batch_size, seq_length, input_size)
-        x = x.permute(0, 2, 1)  # 改变形状为 (batch_size, seq_length, input_size)
+        # px.shape: (batch_size, 96, 1)
+        if self.with_px:
+            px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
+        x = torch.cat((x, px), dim=-1)
+        x = x.permute(0, 2, 1)
         x = self.conv1(x)  # 经过第一个卷积层
         x = nn.ReLU()(x)   # ReLU激活
         x = self.conv2(x)  # 经过第二个卷积层

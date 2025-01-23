@@ -26,6 +26,6 @@ do
     logdir=/data1/yfliu/logs/solar/china_add/ffnn/${1}_${task_id}_${plant_number}
     echo "exporting to" "$logdir/log.txt"
     mkdir -p $logdir
-    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china_add --plant_number $plant_number --months $1 --batch_size 1024 > "$logdir/log.txt" 2>&1 &
+    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china_add --plant_number $plant_number --months $1 --batch_size 1024 --period 24 > "$logdir/log.txt" 2>&1 &
 done
 wait

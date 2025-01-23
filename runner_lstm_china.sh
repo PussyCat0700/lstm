@@ -25,6 +25,6 @@ do
     echo "Running task for plant_number: $plant_number"
     logdir=/data1/yfliu/logs/solar/china/lstm/${1}_${task_id}_${plant_number}
     mkdir -p $logdir
-    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 3 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 > "$logdir/log.txt" 2>&1 &
+    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 3 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 --period 24 > "$logdir/log.txt" 2>&1 &
 done
 wait
