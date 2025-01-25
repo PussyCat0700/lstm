@@ -11,3 +11,4 @@ wandb/**
 *.out
 *.txt
 *.npy
+*.zip

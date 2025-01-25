@@ -9,12 +9,14 @@
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
 #SBATCH --output=./logs/gpnn.out
 #SBATCH --error=./logs/gpnn.err
-#SBATCH --time=50:00:00
+#SBATCH --time=7-00:00:00
+#SBATCH --mail-type=all
+#SBATCH --mail-user=1729372667@qq.com
 
-for i in {0..183}
+for i in {0..328}
 do
     # 替换 %d 为当前的数字 i
-    ckpt_dir="/data1/yfliu/windpower_baseline/gpnn_hourly/gpnn_$i"
+    ckpt_dir="/data1/yfliu/windpower_baseline/runs_china/gpnn/gpnn_$i"
     # 执行命令，传递参数并替换 %d
     python train.py 2 --plant_number $i --checkpoint_dir $ckpt_dir --num_epochs 1000
 done

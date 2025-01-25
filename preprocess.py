@@ -1,6 +1,12 @@
 import os
 import pandas as pd
-from paths import source_power_file, train_power_file, valid_power_file, test_power_file
+from tqdm import tqdm
+import argparse
+from paths import path_loader
+
+# HYPER
+SPLIT = "china_add"
+
 
 def interpolate_missing_data(df):
     """
@@ -23,7 +29,7 @@ def interpolate_missing_data(df):
     df.fillna(method='ffill', inplace=True)  # Fill remaining NaNs with forward fill
     return df
 
-def save_data(train_file, test_file, split=0.95):
+def save_data(train_file, test_file, train_power_file, valid_power_file, test_power_file, split=0.95, months=12):
     """
     Saves training and testing data to CSV files.
     """
@@ -31,6 +37,8 @@ def save_data(train_file, test_file, split=0.95):
     split_idx = int(len(train_file) * split)
     valid_df = train_file.iloc[split_idx:]
     train_df = train_file.iloc[:split_idx]
+    split_date = train_df.iloc[:, 0].min() + pd.DateOffset(months=months)
+    train_df = train_df[train_df.iloc[:, 0] < split_date]
     test_df = test_file
     train_df.to_csv(train_power_file, index=False)
     valid_df.to_csv(valid_power_file, index=False)
@@ -48,27 +56,52 @@ def load_data(train_filename, test_filename):
         dict: A dictionary containing loaded training and testing data.
     """
     if os.path.exists(train_filename) and os.path.exists(test_filename):
-        training_set = pd.read_csv(train_filename).drop(columns=['Unnamed: 0']).values
-        testing_set = pd.read_csv(test_filename).drop(columns=['Unnamed: 0']).values
+        training_set = pd.read_csv(train_filename).iloc[:, 1:].values  # 删除第一列
+        testing_set = pd.read_csv(test_filename).iloc[:, 1:].values  # 删除第一列
     return {
         "train": training_set,
         "test": testing_set,
     }
 
-def get_data(overwrite=False):
+def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:00'):
+    path_loader.init(f"{args.months}m", SPLIT, plant_number)
+    train_power_file = path_loader.paths['train_power_file']
+    valid_power_file = path_loader.paths['valid_power_file']
+    test_power_file = path_loader.paths['test_power_file']
+    source_power_file = path_loader.paths['source_power_file']
+    if not os.path.exists(source_power_file):
+        raise RuntimeError(f'{source_power_file} does not exist')
     if overwrite or not os.path.exists(train_power_file) or not os.path.exists(test_power_file):
         # Load and preprocess data
         data = pd.read_csv(source_power_file)
         # Handle missing data (-999) with linear interpolation
         data = interpolate_missing_data(data)
-        data['Unnamed: 0'] = pd.to_datetime(data['Unnamed: 0'])
-        split_date = data['Unnamed: 0'].min() + pd.DateOffset(years=1) + pd.DateOffset(months=1)
-        training_set = data[data['Unnamed: 0'] < split_date]
-        testing_set = data[data['Unnamed: 0'] >= split_date]
+        data.iloc[:, 0] = pd.to_datetime(data.iloc[:, 0])
+        fin_time = pd.to_datetime(fin_time)
+        split_date = data.iloc[:, 0].min() + pd.DateOffset(years=1)
+        training_set = data[data.iloc[:, 0] < split_date]
+        testing_set = data[(data.iloc[:, 0] >= split_date) & (data.iloc[:, 0] <= fin_time)]
         # Save the processed data
-        save_data(training_set, testing_set)
+        save_data(training_set, testing_set, train_power_file, valid_power_file, test_power_file, months=months)
     
     return load_data(train_power_file, test_power_file)
 
 if __name__ == "__main__":
-    get_data(overwrite=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('csv_dir', help='path to original plant info csv.')
+    parser.add_argument("months", type=int)
+    parser.add_argument('--overwrite', action='store_true')
+    args = parser.parse_args()
+    path_loader.init(f'{args.months}m', SPLIT, 0)
+    sorted_csv_dir = os.path.join(os.path.dirname(args.csv_dir), f'sorted_{os.path.basename(args.csv_dir)}')
+    if not os.path.exists(sorted_csv_dir):
+        df = pd.read_csv(f"{args.csv_dir}")
+        df = df.sort_values(by='TYPE')
+        df.to_csv(sorted_csv_dir)
+    else:
+        df = pd.read_csv(sorted_csv_dir)
+    pbar = tqdm(range(len(df)))
+    for idx, row in df.iterrows():
+        plant_no = idx
+        get_data(plant_no, months=args.months, overwrite=args.overwrite)
+        pbar.update()

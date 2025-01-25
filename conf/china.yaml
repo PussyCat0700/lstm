@@ -1,0 +1,11 @@
+paths:
+  source_power_file: "/data1/yfliu/windpower_baseline/china_nmg_wf_history.csv"
+  source_nwp_dir: "/data1/yfliu/windpower_baseline/china/weather_china_interp"
+  train_power_file: "./inputs/train_china_nmg_wf_history.csv"
+  valid_power_file: "./inputs/valid_china_nmg_wf_history.csv"
+  test_power_file: "./inputs/test_china_nmg_wf_history.csv"
+  results_save_path: "/data1/yfliu/windpower_baseline/runs_china"
+  nwp_min_file: "./inputs/china_nwp_min.npy"
+  nwp_max_file: "./inputs/china_nwp_max.npy"
+params:
+  nwp_input_size: 25

@@ -1,10 +1,19 @@
-# LSTM
+# List Of Models
+## LSTM
 Short-Term Wind Power Forecast Based on Continuous Conditional Random Field
-# FFNN
+## FFNN
 AWNN-Assisted Wind Power Forecasting Using Feed-Forward Neural Network
-# GPCF
+## GPCF
 A High-Accuracy Wind Power Forecasting Model (Letter)
-# XGBOOST
+## XGBOOST
 濮博【Adapted，原先功率他做的是分位预测，我把他竞价预测的拟合方法直接挪到功率上用了】
-# GPNN
+## GPNN
 Xin Yu's Implementation
+## RandomForest
+Day-Ahead Hourly Forecasting of Power Generation From Photovoltaic Plants
+# Steps
+1. create a yaml configuration file under `./conf`.
+1. Use `preprocess.py`. Remeber to replace SPLIT variable to the split associated with your newly created file in `./conf` first!
+1. Replace `source_power_stat` with the preprocessed sorted one by `preprocess.py`.
+1. Train! But please note that checkpoint path for several models need to be manually specified.
+1. Gather your results with `gather_results.py`

@@ -1,10 +1,16 @@
 import csv
 import numpy as np
-from constants import FFNN, GPNN, LSTM
+from constants import CNN_LSTM, CROSS_VIVIT, FFNN, GDBOOST, GPNN, GREEK, PVTRANS_E, RANDOM_FOREST, XGBOOST, XGBOOST_DR_PU, sklearn_model_type_dict
 from dataloading import get_data_loaders_and_denormalizer
-from lstm_model import BiLSTMNWPOnly
+from pvtransnet import PVTransNetE
+from lstm_model import CNNLSTMModel
 from ffnn_model import EnhancedWindPowerNN, WindPowerFFNN
-from metrics import CR, MAE, compute_gte, compute_pte, time_delay_error
+import xgboost as xgb
+from lightgbm import LGBMRegressor
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.ensemble import GradientBoostingRegressor, ExtraTreesRegressor, RandomForestRegressor
+from crossvivit_model import RoCrossViViT
+from metrics import CR, MAE, compute_gte, compute_pte
 
 
 def get_parameter_number(model):
@@ -14,22 +20,55 @@ def get_parameter_number(model):
 
 
 def get_model_and_loader(args, device):
-    if args.model_type == LSTM:
+    with_px = args.period <= 24
+    if args.model_type == CNN_LSTM:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, True)
+        train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = BiLSTMNWPOnly().to(device)
+        model = CNNLSTMModel(args.nwp_input_size, with_px).to(device)
     elif args.model_type == FFNN:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = WindPowerFFNN().to(device)
+        model = WindPowerFFNN(args.nwp_input_size, with_px).to(device)
     elif args.model_type == GPNN:
         # Get data loaders
-        train_loader, val_loader, test_loader, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, False)
+        train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = EnhancedWindPowerNN().to(device)
-    return model, train_loader, val_loader, test_loader, denormalizer
+        model = EnhancedWindPowerNN(args.nwp_input_size, with_px).to(device)
+    elif args.model_type == CROSS_VIVIT:
+        train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
+        model = RoCrossViViT(ctx_channels=args.nwp_input_size).to(device)
+    elif args.model_type == PVTRANS_E:
+        train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
+        model = PVTransNetE(args.nwp_input_size, with_px).to(device)
+    return model, train_loader, val_loader, test_loaders, denormalizer
+
+
+def get_sklearn_model(model_type_int:int):
+    model_type = sklearn_model_type_dict[model_type_int]
+    if model_type == XGBOOST:
+        model = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3, learning_rate=0.1, max_depth=5, alpha=10, n_estimators=100)
+    elif model_type == XGBOOST_DR_PU:
+        params_LGBM_wind_trading={
+            'objective':'mse',
+            'num_leaves': 1000,
+            'n_estimators': 500,
+            'max_depth':6,
+            'min_data_in_leaf': 700,
+            'learning_rate':0.078,
+            'lambda_l1': 70,
+            'lambda_l2': 40,
+            'verbose':-1,
+        }
+        model = MultiOutputRegressor(LGBMRegressor(**params_LGBM_wind_trading))
+    elif model_type == RANDOM_FOREST:
+        model = MultiOutputRegressor(RandomForestRegressor(n_estimators=300, min_samples_leaf=5))
+    elif model_type == GDBOOST:
+        model = MultiOutputRegressor(GradientBoostingRegressor(loss='squared_error', learning_rate=0.1, max_depth=5, alpha=0.1, n_estimators=10, random_state=42))
+    elif model_type == GREEK:
+        model = MultiOutputRegressor(ExtraTreesRegressor(n_estimators=100, random_state=42))
+    return model
 
 
 def compute_all_metrics(preds, gts, cap):

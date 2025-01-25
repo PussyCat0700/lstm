@@ -1,0 +1,12 @@
+plant_number: 436
+paths:
+  source_power_file: "/data1/yfliu/solar_baseline/solar/china_data/{plant_number}.csv"
+  source_power_stat: "/data1/yfliu/solar_baseline/solar/china_data/china_info.csv"
+  source_coords_file: "/data1/yfliu/solar_baseline/solar/china_data/china_windfarm_coord.npy"
+  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/real_weather_china_all_interp/{plant_number}"
+  processed_dir: "/data1/yfliu/solar_baseline/solar/preprocessed"
+  results_save_path: "/data1/yfliu/solar_baseline/china_real"
+params:
+  nwp_input_size: 14
+  nwp_input_hours: 1
+  real_weather: true
