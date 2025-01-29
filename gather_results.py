@@ -25,11 +25,14 @@ info_csv_file = path_loader.paths['source_power_stat']
 df = read_station_info(info_csv_file)
 # 按TYPE列进行分组
 grouped = df.groupby('TYPE')
-save_base_path = os.path.join('./outputs', args.plantset, args.model, args.months)
+save_base_path = os.path.join('./outputs', args.plantset, args.model)
 
 for postfix in postfixes:
     print(f"{postfix=}")
-    save_path = os.path.join(save_base_path, '_'.join(postfix.split('_')[1:])) if postfix else save_base_path
+    if postfix:
+        save_path = os.path.join(save_base_path, '_'.join(postfix.split('_')[1:]), args.months)
+    else:
+        save_path = os.path.join(save_base_path, args.months)
     os.makedirs(save_path, exist_ok=True)
     output_zipfile = os.path.join(save_path, f"{args.plantset}_{args.model}_{args.months}.zip")
     if args.zip:
@@ -67,7 +70,7 @@ for postfix in postfixes:
                     if df["rmse"][0] >= 0:
                         all_metrics.append(df)
                         if args.zip:
-                            file_paths = [os.path.join(station_path_original, x) for x in ['all_gts.npy', 'all_preds.npy', f'output{postfix}.csv']]
+                            file_paths = [os.path.join(station_path_original, x) for x in [f'all_gts{postfix}.npy', f'all_preds{postfix}.npy', f'output{postfix}.csv']]
                             for file_path in file_paths:
                                 if not os.path.isfile(file_path):
                                     continue
