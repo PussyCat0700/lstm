@@ -70,13 +70,15 @@ for postfix in postfixes:
                     if df["rmse"][0] >= 0:
                         all_metrics.append(df)
                         if args.zip:
-                            file_paths = [os.path.join(station_path_original, x) for x in [f'all_gts{postfix}.npy', f'all_preds{postfix}.npy', f'output{postfix}.csv']]
+                            file_paths = [os.path.join(station_path_original, x) for x in [f'output{postfix}.csv', f'all_gts{postfix}.npy', f'all_preds{postfix}.npy']]
                             for file_path in file_paths:
                                 if not os.path.isfile(file_path):
                                     continue
                                 relative_path = f'{station_serial}/{os.path.basename(file_path)}'
                                 # 添加文件到 zip 包
                                 zipf.write(file_path, arcname=relative_path)
+                                if file_path.endswith('.csv'):
+                                    break
                     else:
                         all_extreme_large.append(station_serial)
             if filtered:

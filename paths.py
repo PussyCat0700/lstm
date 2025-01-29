@@ -36,7 +36,7 @@ class LazyPathLoader:
     def init(self, months, plantset, plant_number, type_value=None, period: int=None):
         self.period = period
         # TODO make this look more like code
-        if period > 24:
+        if period is not None and period > 24:
             self.period = None
         else:
             self.period = 24
