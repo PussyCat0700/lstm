@@ -428,7 +428,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
 
 import csv
 
-def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
+def convert_torch_dataset_to_csv(dataset, folder_path, postfix="", force_data=False):
     # 创建文件夹（如果不存在）
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -442,7 +442,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
     nwp_file = os.path.join(folder_path, f"nwp_data_scaled{postfix}.csv")
     ready_sign_path = os.path.join(folder_path, f"READY{postfix}")
     ready_time_sign_path = os.path.join(folder_path, f"READY(TIME){postfix}")
-    if not os.path.exists(ready_sign_path):
+    is_ready = os.path.exists(ready_time_sign_path) and os.path.exists(ready_sign_path) and (not force_data)
+    if not is_ready:
         print(f"Saving dataset to CSV in {folder_path}...")
 
         # 打开文件，以写入模式逐步保存数据
@@ -474,15 +475,6 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
             f.write("")
         with open(ready_time_sign_path, 'w') as f:
             f.write("")
-    if not os.path.exists(ready_time_sign_path):
-        with open(time_csv, 'w', newline='') as f_time:
-            writer_time = csv.writer(f_time)
-            pbar = tqdm(range(len(dataset)))
-            for i in pbar:
-                item = dataset[i]
-                writer_time.writerow(np.array(item[KEY_TIME_Y]).T.flatten())
-        with open(ready_time_sign_path, 'w') as f:
-            f.write("")
                 
     return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file, time_csv)
 
@@ -507,12 +499,12 @@ def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file, time_csv):
         KEY_TIME_Y: times,
     }
 
-def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int):
+def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int, force_data=False):
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number, period)
     postfix = ""
     if period <= 24:
         postfix = f"_{period}h"
-    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix)
+    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix, force_data)
     return data, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):

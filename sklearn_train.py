@@ -19,12 +19,12 @@ def everything(args, period:int):
         print(f"{args.plant_number} does not have source input file")
         exit(0)
     output_path = os.path.join(save_path, f'output{period}h.csv')
-    is_done = is_done and os.path.exists(output_path)
+    is_done = is_done and os.path.exists(output_path) and (not args.force_data)
     if is_done:
         print(f"{args.plant_number} already has output metrics.csv at {save_path}")
         exit(0)
     model_ckpt = os.path.join(save_path, f'model_{period}h.ckpt')
-    train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path, period)
+    train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path, period, args.force_data)
     if os.path.exists(model_ckpt):
         print(f"loading model from {model_ckpt}")
         with open(model_ckpt, 'rb') as f:
@@ -36,7 +36,7 @@ def everything(args, period:int):
         model.fit(X_nwp_train, Y_train)
         with open(model_ckpt, "wb") as f:
             pickle.dump(model,f)
-    test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path, period)
+    test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path, period, args.force_data)
     X_nwp_test = test_data[KEY_NORM_NWP]
     Y_test_real = test_data[KEY_REAL_Y]
     Y_time = test_data[KEY_TIME_Y]
@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument("--plant_set", choices=PLANTS.keys())
     parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
     parser.add_argument("--period", type=int, default=24)
+    parser.add_argument("--force_data", action='store_true', help='force data re-export')
     args = parser.parse_args()
     if args.period > 24:
         everything(args, args.period)
