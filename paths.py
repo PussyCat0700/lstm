@@ -8,6 +8,7 @@ PLANTS = {
     "nmg": './conf/solar/nmg.yaml',
     "china_add": './conf/solar/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
+    'nanwang': './conf/solar/nanwang.yaml',
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
@@ -50,7 +51,7 @@ class LazyPathLoader:
         if months != '12m':
             self.ablation_name = months
         # init paths
-        df = read_station_info(self.config['paths']['source_power_stat'])
+        df = read_station_info(self.potential_sorted_stats_path())
         for idx, row in df.iterrows():
             plant_no = row["PLANT_NO"]
             plant_type = row.get("TYPE", None)
@@ -70,6 +71,13 @@ class LazyPathLoader:
         _paths = self._update_paths(self.config['paths'])
         self._create_directories(_paths)
         return _paths
+    
+    def potential_sorted_stats_path(self):
+        csv_dir = self.config['paths']['source_power_stat']
+        sorted_csv_dir = os.path.join(os.path.dirname(csv_dir), f'sorted_{os.path.basename(csv_dir)}')
+        ret_dir = sorted_csv_dir if os.path.exists(sorted_csv_dir) else csv_dir
+        self.config['paths']['source_power_stat'] = ret_dir
+        return ret_dir
     
     def check_exists(self):
         return os.path.exists(self.paths['source_power_file'])

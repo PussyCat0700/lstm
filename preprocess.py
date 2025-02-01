@@ -1,11 +1,13 @@
 import os
+from typing import Dict
 import pandas as pd
 from tqdm import tqdm
 import argparse
 from paths import path_loader
 
 # HYPER
-SPLIT = "china_add"
+SPLIT = "nanwang"
+REF_SPLITS_PATH = "/data1/yfliu/solar_baseline/solar/nanwang/数据集划分.csv"
 
 
 def interpolate_missing_data(df):
@@ -63,7 +65,7 @@ def load_data(train_filename, test_filename):
         "test": testing_set,
     }
 
-def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:00'):
+def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:00', split_info:Dict=None):
     path_loader.init(f"{args.months}m", SPLIT, plant_number)
     train_power_file = path_loader.paths['train_power_file']
     valid_power_file = path_loader.paths['valid_power_file']
@@ -78,7 +80,10 @@ def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:0
         data = interpolate_missing_data(data)
         data.iloc[:, 0] = pd.to_datetime(data.iloc[:, 0])
         fin_time = pd.to_datetime(fin_time)
-        split_date = data.iloc[:, 0].min() + pd.DateOffset(years=1)
+        if split_info:
+            split_date = pd.to_datetime(split_info['测试集开始时间'])
+        else:
+            split_date = data.iloc[:, 0].min() + pd.DateOffset(years=1)
         training_set = data[data.iloc[:, 0] < split_date]
         testing_set = data[(data.iloc[:, 0] >= split_date) & (data.iloc[:, 0] <= fin_time)]
         # Save the processed data
@@ -88,20 +93,29 @@ def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('csv_dir', help='path to original plant info csv.')
     parser.add_argument("months", type=int)
     parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument("--sort", action='store_true', help='do it only at first time')
     args = parser.parse_args()
     path_loader.init(f'{args.months}m', SPLIT, 0)
-    sorted_csv_dir = os.path.join(os.path.dirname(args.csv_dir), f'sorted_{os.path.basename(args.csv_dir)}')
-    if not os.path.exists(sorted_csv_dir):
-        df = pd.read_csv(f"{args.csv_dir}")
-        df = df.sort_values(by='TYPE')
-        df.to_csv(sorted_csv_dir)
+    args.csv_dir = path_loader.config['paths']['source_power_stat']
+    if args.sort:
+        sorted_csv_dir = os.path.join(os.path.dirname(args.csv_dir), f'sorted_{os.path.basename(args.csv_dir)}')
+        if not os.path.exists(sorted_csv_dir) or args.overwrite:
+            df = pd.read_csv(f"{args.csv_dir}")
+            df = df.sort_values(by='TYPE')
+            df.to_csv(sorted_csv_dir)
     else:
-        df = pd.read_csv(sorted_csv_dir)
+        df = pd.read_csv(args.csv_dir)
     pbar = tqdm(range(len(df)))
+    df_splits = None
+    split_info = None
+    if REF_SPLITS_PATH:
+        df_splits = pd.read_csv(REF_SPLITS_PATH)
     for idx, row in df.iterrows():
-        plant_no = idx
-        get_data(plant_no, months=args.months, overwrite=args.overwrite)
+        plant_idx = idx
+        if df_splits is not None:
+            plant_no = row['PLANT_NO']
+            split_info = df_splits[df_splits['文件名'] == plant_no].to_dict(orient='records')[0]
+        get_data(plant_idx, months=args.months, overwrite=args.overwrite, split_info=split_info)
         pbar.update()
