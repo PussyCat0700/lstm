@@ -203,8 +203,8 @@ class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
     grid = torch.Tensor(np.array([[(x, y) for y in np.arange(54, 2.75, -0.25)] for x in np.arange(73, 136.25, 0.25)]))
     
     
-    def __init__(self, split, plant_number, power_minmax=None):
-        super().__init__(split, plant_number, power_minmax)
+    def __init__(self, split, plant_number, power_minmax=None, **kwargs):
+        super().__init__(split, plant_number, power_minmax, **kwargs)
         self.coords = np.load(path_loader.paths['source_coords_file'])
     
     def get_coords_neighbors(self):
@@ -246,7 +246,7 @@ class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
         return ret
         
 
-class PowerPlantDailyDataset(PowerPlantDataset):
+class PowerPlantDailyDataset(PowerPlantDatasetWithNeighbors):
     def __len__(self):
         return len(self.data) // 96 -  2  # Daily
 
@@ -256,7 +256,7 @@ class PowerPlantDailyDataset(PowerPlantDataset):
         return start_time
 
 
-class PowerPlantHourlyDataset(PowerPlantDataset):
+class PowerPlantHourlyDataset(PowerPlantDatasetWithNeighbors):
     def __len__(self):
         return len(self.data) // 4 - (24+16+24)  # Hourly
     
@@ -335,7 +335,54 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         }
 
 
-class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDataset):
+class PowerPlantShortTermDatasetWithNeighbors(PowerPlantShortTermDataset):
+    grid = torch.Tensor(np.array([[(x, y) for y in np.arange(54, 2.75, -0.25)] for x in np.arange(73, 136.25, 0.25)]))
+    
+    
+    def __init__(self, split, plant_number, pred_span:int, power_minmax=None):
+        super().__init__(split, plant_number, pred_span, power_minmax)
+        self.coords = np.load(path_loader.paths['source_coords_file'])
+    
+    def get_coords_neighbors(self):
+        
+        weather_coords = PowerPlantDatasetWithNeighbors.grid[
+            self.coords[self.plant_number, :, 0],
+            self.coords[self.plant_number, :, 1],
+            :
+        ]  # [64, 2]
+        weather_coords = weather_coords.reshape(H, W, 2).permute(2, 0, 1)  # [2, H, W]
+        return weather_coords
+
+    def get_coords_station(self):
+        meta = path_loader.meta
+        station_coords = torch.Tensor((meta['LONGITUDE'], meta['LATITUDE']))
+        return station_coords.unsqueeze(-1).unsqueeze(-1)  # [2, 1, 1]
+    
+    def normalize_coords(self, nb_coords, st_coords):
+        global_min = torch.min(nb_coords.min(), st_coords.min())
+        global_max = torch.max(nb_coords.max(), st_coords.max())
+        nb_coords_normalized = (nb_coords - global_min) / (global_max - global_min)
+        st_coords_normalized = (st_coords - global_min) / (global_max - global_min)
+        # Scale both tensors to [-1, 1]
+        nb_coords_normalized = 2 * nb_coords_normalized - 1
+        st_coords_normalized = 2 * st_coords_normalized - 1
+        return nb_coords_normalized, st_coords_normalized
+    
+    def __getitem__(self, idx):
+        ret = super().__getitem__(idx)
+        ts_coords = self.get_coords_station()
+        ctx_coords = self.get_coords_neighbors()
+        ctx_coords_scaled, ts_coords_scaled = self.normalize_coords(ctx_coords, ts_coords)
+        nwp_data = ret[KEY_NORM_NWP]
+        nwp_data_withcoords = nwp_data.permute(0, 2, 1)  # [T, H*W, C] -> [T, C, H*W]
+        nwp_data_withcoords = nwp_data_withcoords.reshape(*nwp_data_withcoords.shape[:2], H, W)
+        ret[KEY_NORM_NWP] = nwp_data_withcoords  # [T, C, H, W]
+        ret[KEY_CTX_COORDS] = ctx_coords_scaled
+        ret[KEY_TS_COORDS] = ts_coords_scaled
+        return ret
+
+
+class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDatasetWithNeighbors):
     def __len__(self):
         return math.floor((len(self.data) // 4 - 24) / self.pred_span)
     
@@ -345,7 +392,7 @@ class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDataset):
         return start_time
 
 
-class PowerPlantShortTermHourlyDataset(PowerPlantShortTermDataset):
+class PowerPlantShortTermHourlyDataset(PowerPlantShortTermDatasetWithNeighbors):
     def __len__(self):
         return len(self.data) // 4 - 24 - 24  # extra 24 evading 1800 offset
     
