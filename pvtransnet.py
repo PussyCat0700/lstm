@@ -30,7 +30,7 @@ class PVTransNetE(nn.Module):
         # px.shape: (batch_size, 96, 1)
         if self.with_px:
             px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
-        x = torch.cat((x, px), dim=-1)
+            x = torch.cat((x, px), dim=-1)
         emb = self.embedding(x)
         y = self.model(emb)
         out = self.fc1(y.reshape(B, -1))

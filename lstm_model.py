@@ -87,7 +87,7 @@ class CNNLSTMModel(nn.Module):
         # px.shape: (batch_size, 96, 1)
         if self.with_px:
             px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
-        x = torch.cat((x, px), dim=-1)
+            x = torch.cat((x, px), dim=-1)
         x = x.permute(0, 2, 1)
         x = self.conv1(x)  # 经过第一个卷积层
         x = nn.ReLU()(x)   # ReLU激活

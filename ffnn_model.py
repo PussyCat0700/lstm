@@ -19,7 +19,9 @@ class WindPowerFFNN(nn.Module):
         # px.shape: (batch_size, 96, 1)
         if self.with_px:
             px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
-        x = torch.cat((nwp_data, px), dim=-1)
+            x = torch.cat((nwp_data, px), dim=-1)
+        else:
+            x = nwp_data
         
         x = x.reshape(x.shape[0], -1)
         output = self.fc(x)  # [B, 96]
@@ -45,7 +47,9 @@ class EnhancedWindPowerNN(nn.Module):
         # px.shape: (batch_size, 96, 1)
         if self.with_px:
             px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
-        x = torch.cat((nwp_data, px), dim=-1)
+            x = torch.cat((nwp_data, px), dim=-1)
+        else:
+            x = nwp_data
         
         x = x.reshape(x.shape[0], -1)
         x = F.relu(self.fc1(x))

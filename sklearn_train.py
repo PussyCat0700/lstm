@@ -5,7 +5,7 @@ from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
 from constants import sklearn_model_type_dict
 from utils import compute_all_metrics, get_sklearn_model, write_csv
-from paths import KEY_NORM_NWP, KEY_NORM_Y, KEY_REAL_Y, PLANTS, path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_Y, PLANTS, path_loader
 import os
 import traceback
 
@@ -18,20 +18,28 @@ def everything(args, period:int):
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
         exit(0)
+    output_path = os.path.join(save_path, f'output{period}h.csv')
+    is_done = is_done and os.path.exists(output_path) and (not args.force_data)
     if is_done:
         print(f"{args.plant_number} already has output metrics.csv at {save_path}")
         exit(0)
-    model = get_sklearn_model(args.model_type)
-    train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path, period)
-    X_nwp_train = train_data[KEY_NORM_NWP]
-    Y_train = train_data[KEY_NORM_Y]
-    model.fit(X_nwp_train, Y_train)
     model_ckpt = os.path.join(save_path, f'model_{period}h.ckpt')
-    with open(model_ckpt, "wb") as f:
-        pickle.dump(model,f)
-    test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path, period)
+    train_data, denormalizer = get_dataset_and_denormalizer_sklearn(args.plant_number, "train", save_path, period, args.force_data)
+    if os.path.exists(model_ckpt):
+        print(f"loading model from {model_ckpt}")
+        with open(model_ckpt, 'rb') as f:
+            model = pickle.load(f)
+    else:
+        model = get_sklearn_model(args.model_type)
+        X_nwp_train = train_data[KEY_NORM_NWP]
+        Y_train = train_data[KEY_NORM_Y]
+        model.fit(X_nwp_train, Y_train)
+        with open(model_ckpt, "wb") as f:
+            pickle.dump(model,f)
+    test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path, period, args.force_data)
     X_nwp_test = test_data[KEY_NORM_NWP]
     Y_test_real = test_data[KEY_REAL_Y]
+    Y_time = test_data[KEY_TIME_Y]
 
 
     try:
@@ -42,7 +50,7 @@ def everything(args, period:int):
         preds_test = np.maximum(preds_test, 0)
         Y_test_real = np.maximum(Y_test_real, 0)
         png_path = os.path.join(save_path, f"{args.plant_number}_{period}h.png")
-        plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10)
+        plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10, all_y_times=Y_time)
         all_metrics = compute_all_metrics(preds_test, Y_test_real, denormalizer(1.0))
         print(all_metrics)
         metrics_path = os.path.join(save_path, f'metrics_{period}h.csv')
@@ -80,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument("--plant_set", choices=PLANTS.keys())
     parser.add_argument("--plant_type", type=int, choices=[0, 1], default=None, help="0 for windpower, 1 for solarpower.")
     parser.add_argument("--period", type=int, default=24)
+    parser.add_argument("--force_data", action='store_true', help='force data re-export')
     args = parser.parse_args()
     if args.period > 24:
         everything(args, args.period)

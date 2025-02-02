@@ -362,13 +362,17 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
     def __init__(self, split, plant_number, pred_span=40, power_minmax=None):
         super().__init__(split, plant_number, power_minmax)
         self.pred_span = pred_span
+        self.offset = 8+6 if self.split == 'train' else 0
     
     def __len__(self):
-        return len(self.data) // 4 - ((8+6)+16+24)  # Hourly
+        if self.pred_span > 24:
+            length = len(self.data) // 4 - (self.offset+16+24)  # Hourly
+        else:
+            length = len(self.data) // 4 - (self.offset+self.pred_span)  # Hourly
+        return length
     
     def _get_start_time(self, idx):
-        offset = 4*(8+6)  # hh:00:00
-        start_time = self.data.index[idx*4+offset].replace(second=0, microsecond=0)
+        start_time = self.data.index[4*(idx+self.offset)].replace(second=0, microsecond=0)
         return start_time
     
     def __getitem__(self, idx):
@@ -409,19 +413,22 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
         nwp_data_scaled = nwp_data_scaled[self.pred_span-1]  # only nwp_input_dim is left
-
+        time_x = self.data.loc[x_start_time:x_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
+        time_y = self.data.loc[y_start_time:y_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
             KEY_NORM_X: torch.tensor(X_norm, dtype=torch.float32),
             KEY_NORM_Y: torch.tensor(Y_norm, dtype=torch.float32),
             KEY_NORM_NWP: torch.tensor(nwp_data_scaled, dtype=torch.float32),
+            KEY_TIME_X: time_x,
+            KEY_TIME_Y: time_y,
         }
 
 
 import csv
 
-def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
+def convert_torch_dataset_to_csv(dataset, folder_path, postfix="", force_data=False):
     # 创建文件夹（如果不存在）
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -431,9 +438,12 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
     Y_file = os.path.join(folder_path, f"Y_norm{postfix}.csv")
     X_file_real = os.path.join(folder_path, f"X_real{postfix}.csv")
     Y_file_real = os.path.join(folder_path, f"Y_real{postfix}.csv")
+    time_csv = os.path.join(folder_path, f"time{postfix}.csv")
     nwp_file = os.path.join(folder_path, f"nwp_data_scaled{postfix}.csv")
     ready_sign_path = os.path.join(folder_path, f"READY{postfix}")
-    if not os.path.exists(ready_sign_path):
+    ready_time_sign_path = os.path.join(folder_path, f"READY(TIME){postfix}")
+    is_ready = os.path.exists(ready_time_sign_path) and os.path.exists(ready_sign_path) and (not force_data)
+    if not is_ready:
         print(f"Saving dataset to CSV in {folder_path}...")
 
         # 打开文件，以写入模式逐步保存数据
@@ -441,7 +451,8 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
             open(Y_file, 'w', newline='') as f_Y, \
             open(X_file_real, 'w', newline='') as f_X_real, \
             open(Y_file_real, 'w', newline='') as f_Y_real, \
-            open(nwp_file, 'w', newline='') as f_nwp:
+            open(nwp_file, 'w', newline='') as f_nwp, \
+            open(time_csv, 'w', newline='') as f_time:
 
             # 创建csv writer对象
             writer_X = csv.writer(f_X)
@@ -449,6 +460,7 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
             writer_X_real = csv.writer(f_X_real)
             writer_Y_real = csv.writer(f_Y_real)
             writer_nwp = csv.writer(f_nwp)
+            writer_time = csv.writer(f_time)
             pbar = tqdm(range(len(dataset)))
             for i in pbar:
                 item = dataset[i]
@@ -458,33 +470,41 @@ def convert_torch_dataset_to_csv(dataset, folder_path, postfix=""):
                 writer_X_real.writerow(item[KEY_REAL_X].tolist())        # 保存 X_norm
                 writer_Y_real.writerow(item[KEY_REAL_Y].tolist())        # 保存 Y_norm
                 writer_nwp.writerow(item[KEY_NORM_NWP].tolist())  # 保存nwp_data_scaled展平为一行
+                writer_time.writerow(np.array(item[KEY_TIME_Y]).T.flatten())
         with open(ready_sign_path, "w") as f:
             f.write("")
-    return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file)
+        with open(ready_time_sign_path, 'w') as f:
+            f.write("")
+                
+    return load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file, time_csv)
 
 
-def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file):
+def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file, time_csv):
     # 加载并转换为numpy数组
     X = np.loadtxt(X_file, delimiter=',')
     Y = np.loadtxt(Y_file, delimiter=',')
     X_real = np.loadtxt(X_file_real, delimiter=',')
     Y_real = np.loadtxt(Y_file_real, delimiter=',')
     nwp = np.loadtxt(nwp_file, delimiter=',').reshape(-1, path_loader.nwp_input_size)  # 恢复原来的形状
-
+    times = []
+    with open(time_csv, 'r') as fi:
+        for line in fi.readlines():
+            times.extend([x.strip() for x in line.split(',')])
     return {
         KEY_REAL_X: X_real,
         KEY_REAL_Y: Y_real,
         KEY_NORM_X: X,
         KEY_NORM_Y: Y,
         KEY_NORM_NWP: nwp,
+        KEY_TIME_Y: times,
     }
 
-def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int):
+def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int, force_data=False):
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number, period)
     postfix = ""
     if period <= 24:
         postfix = f"_{period}h"
-    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix)
+    data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix, force_data)
     return data, dataset.denormalize_power_data
 
 def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
@@ -546,7 +566,7 @@ if __name__ == '__main__':
     for period in [1, 4, 24, 40]:
         print(f'{period=}')
         data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
-        print(data['norm_y'])
+        assert len(data[KEY_TIME_Y]) == len(data[KEY_NORM_Y].flatten())
     train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
     for period, test_loader in test_loaders.items(): 
         outlen = period*4
