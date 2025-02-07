@@ -124,7 +124,7 @@ class LazyPathLoader:
         os.makedirs(runpath, exist_ok=True)
         metric_filename = 'metrics.csv'
         if self.period:
-            metric_filename = f'metric_{self.period}.csv'
+            metric_filename = f'metrics_{self.period}h.csv'
         metric_dir = os.path.join(runpath, metric_filename)
         return runpath, os.path.exists(metric_dir)
 

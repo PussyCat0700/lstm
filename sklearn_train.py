@@ -18,7 +18,7 @@ def everything(args, period:int):
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
         exit(0)
-    output_path = os.path.join(save_path, f'output{period}h.csv')
+    output_path = os.path.join(save_path, f'output_{period}h.csv')
     is_done = is_done and os.path.exists(output_path) and (not args.force_data)
     if is_done:
         print(f"{args.plant_number} already has output metrics.csv at {save_path}")
@@ -50,6 +50,7 @@ def everything(args, period:int):
         preds_test = np.maximum(preds_test, 0)
         Y_test_real = np.maximum(Y_test_real, 0)
         png_path = os.path.join(save_path, f"{args.plant_number}_{period}h.png")
+        import pdb;pdb.set_trace()
         plot_predictions_vs_ground_truth_vanilla(preds_test, Y_test_real, png_path, days=10, all_y_times=Y_time)
         all_metrics = compute_all_metrics(preds_test, Y_test_real, denormalizer(1.0))
         print(all_metrics)
