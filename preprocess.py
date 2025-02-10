@@ -6,8 +6,8 @@ import argparse
 from paths import path_loader
 
 # HYPER
-SPLIT = "nanwang"
-REF_SPLITS_PATH = "/data1/yfliu/solar_baseline/solar/nanwang/数据集划分.csv"
+SPLIT = "newly_built"
+REF_SPLITS_PATH = "/data1/yfliu/solar_baseline/solar/newly_built/newly_built_stations_info.csv"
 
 
 def interpolate_missing_data(df):
@@ -65,7 +65,7 @@ def load_data(train_filename, test_filename):
         "test": testing_set,
     }
 
-def get_data(plant_number, months, overwrite=False, fin_time='2024-09-30 23:45:00', split_info:Dict=None):
+def get_data(plant_number, months, overwrite=False, fin_time='2024-04-17 09:00:00', split_info:Dict=None):
     path_loader.init(f"{args.months}m", SPLIT, plant_number)
     train_power_file = path_loader.paths['train_power_file']
     valid_power_file = path_loader.paths['valid_power_file']
@@ -116,6 +116,6 @@ if __name__ == "__main__":
         plant_idx = idx
         if df_splits is not None:
             plant_no = row['PLANT_NO']
-            split_info = df_splits[df_splits['文件名'] == plant_no].to_dict(orient='records')[0]
+            split_info = df_splits[df_splits['PLANT_NO'] == plant_no].to_dict(orient='records')[0]
         get_data(plant_idx, months=args.months, overwrite=args.overwrite, split_info=split_info)
         pbar.update()

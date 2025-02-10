@@ -9,6 +9,7 @@ PLANTS = {
     "china_add": './conf/solar/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
+    'newly_built': './conf/solar/newly_built.yaml'
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
