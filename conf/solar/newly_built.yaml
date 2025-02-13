@@ -1,0 +1,11 @@
+plant_number: 96
+paths:
+  source_power_file: "/data1/yfliu/solar_baseline/solar/newly_built/newly_built_stations_data/{plant_number}.csv"
+  source_power_stat: "/data1/yfliu/solar_baseline/solar/newly_built/newly_built_stations_info.csv"
+  source_coords_file: "/data1/yfliu/solar_baseline/solar/newly_built/new_station_windfarm_coord.npy"
+  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/weather_new_station_interp/{plant_number}"
+  processed_dir: "/data1/yfliu/solar_baseline/solar/preprocessed"
+  results_save_path: "/data1/yfliu/solar_baseline/newly_built"
+params:
+  nwp_input_size: 27
+  real_weather: false

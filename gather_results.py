@@ -18,7 +18,7 @@ args = parser.parse_args()
 
 path_loader.init(args.months, args.plantset, 0, period=args.period)
 if args.period > 24:
-    postfixes = ["",]
+    postfixes = ["_40h",]
 else:
     postfixes = ["_24h", "_4h", "_1h"]
 info_csv_file = path_loader.paths['source_power_stat']
@@ -45,10 +45,12 @@ for postfix in postfixes:
         output_file = os.path.join(save_path, f"averaged_metrics_{group_type}.csv")
         filtered_record_file = os.path.join(save_path, f"filtered_stations_{group_type}.txt")
         extreme_large_file = os.path.join(save_path, f"toolargecap_stations_{group_type}.txt")
+        only_npy_file = os.path.join(save_path, f"onlynpy_stations_{group_type}.txt")
         # Initialize an empty DataFrame to store metrics from all files
         all_metrics = []
         all_filtered = []
         all_extreme_large = []
+        all_only_npy = []
         # Loop through all subdirectories in ckpt_dir
         pbar = tqdm(range(len(group_data)))
         for idx, row in group_data.iterrows():
@@ -71,6 +73,7 @@ for postfix in postfixes:
                         all_metrics.append(df)
                         if args.zip:
                             file_paths = [os.path.join(station_path_original, x) for x in [f'output{postfix}.csv', f'all_gts{postfix}.npy', f'all_preds{postfix}.npy']]
+                            len_all_only_npy = len(all_only_npy)
                             for file_path in file_paths:
                                 if not os.path.isfile(file_path):
                                     continue
@@ -79,6 +82,8 @@ for postfix in postfixes:
                                 zipf.write(file_path, arcname=relative_path)
                                 if file_path.endswith('.csv'):
                                     break
+                                elif len(all_only_npy) == len_all_only_npy:
+                                    all_only_npy.append(station_serial)
                     else:
                         all_extreme_large.append(station_serial)
             if filtered:
@@ -90,6 +95,9 @@ for postfix in postfixes:
 
         with open(extreme_large_file, 'w') as f:
             f.writelines([x+'\n' for x in all_extreme_large])
+        
+        with open(only_npy_file, 'w') as f:
+            f.writelines([x+'\n' for x in all_only_npy])
 
         # Combine all metrics into a single DataFrame
         if all_metrics:

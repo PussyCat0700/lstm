@@ -321,7 +321,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
-        time_y = self._could_pad_len(idx, time_y, None).tolist()
+        time_y = self._could_pad_len(idx, time_y, '').tolist()
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),

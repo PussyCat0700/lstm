@@ -9,6 +9,7 @@ PLANTS = {
     "china_add": './conf/solar/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
+    'newly_built': './conf/solar/newly_built.yaml'
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
@@ -124,7 +125,7 @@ class LazyPathLoader:
         os.makedirs(runpath, exist_ok=True)
         metric_filename = 'metrics.csv'
         if self.period:
-            metric_filename = f'metric_{self.period}.csv'
+            metric_filename = f'metrics_{self.period}h.csv'
         metric_dir = os.path.join(runpath, metric_filename)
         return runpath, os.path.exists(metric_dir)
 

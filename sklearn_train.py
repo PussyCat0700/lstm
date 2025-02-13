@@ -18,7 +18,7 @@ def everything(args, period:int):
     if not path_loader.check_exists():
         print(f"{args.plant_number} does not have source input file")
         exit(0)
-    output_path = os.path.join(save_path, f'output{period}h.csv')
+    output_path = os.path.join(save_path, f'output_{period}h.csv')
     is_done = is_done and os.path.exists(output_path) and (not args.force_data)
     if is_done:
         print(f"{args.plant_number} already has output metrics.csv at {save_path}")
