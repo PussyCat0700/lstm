@@ -77,7 +77,6 @@ class PowerPlantDataset(Dataset):
             pad_len = self.outlen - len(x)
             print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
             x = np.pad(x, (0, pad_len), mode='constant', constant_values=pad_value)
-            import pdb;pdb.set_trace()
         return x
 
     def _get_start_time(self, idx):

@@ -25,23 +25,23 @@ def get_model_and_loader(args, device):
         # Get data loaders
         train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = CNNLSTMModel(args.nwp_input_size, with_px).to(device)
+        model = CNNLSTMModel(args.nwp_input_size, args.nwp_input_len, with_px).to(device)
     elif args.model_type == FFNN:
         # Get data loaders
         train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = WindPowerFFNN(args.nwp_input_size, with_px).to(device)
+        model = WindPowerFFNN(args.nwp_input_size, args.nwp_input_len, with_px).to(device)
     elif args.model_type == GPNN:
         # Get data loaders
         train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
         # Initialize model, criterion, and optimizer
-        model = EnhancedWindPowerNN(args.nwp_input_size, with_px).to(device)
+        model = EnhancedWindPowerNN(args.nwp_input_size, args.nwp_input_len, with_px).to(device)
     elif args.model_type == CROSS_VIVIT:
         train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
-        model = RoCrossViViT(ctx_channels=args.nwp_input_size).to(device)
+        model = RoCrossViViT(ctx_channels=args.nwp_input_size, ts_length=args.nwp_input_len).to(device)
     elif args.model_type == PVTRANS_E:
         train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(args.plant_number, args.batch_size, args.period)
-        model = PVTransNetE(args.nwp_input_size, with_px).to(device)
+        model = PVTransNetE(args.nwp_input_size, args.nwp_input_len, with_px).to(device)
     return model, train_loader, val_loader, test_loaders, denormalizer
 
 

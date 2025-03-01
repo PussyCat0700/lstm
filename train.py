@@ -285,6 +285,7 @@ if __name__ == "__main__":
     args.num_epochs = 30
     path_loader.init(args.months, args.plant_set, args.plant_number, args.plant_type, args.period)
     args.nwp_input_size = path_loader.nwp_input_size
+    args.nwp_input_len = path_loader.nwp_input_len
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
     with open(logger_file, 'w') as sys.stdout:

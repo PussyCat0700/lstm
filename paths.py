@@ -41,14 +41,16 @@ class LazyPathLoader:
     def init(self, months, plantset, plant_number, type_value=None, period: int=None):
         self.period = period
         # TODO make this look more like code
-        if period is not None and period > 24:
-            self.period = None
+        if period is not None:
+            self.period = period
         else:
             self.period = 24
         # End of TODO
         self.plant_number = plant_number
         self.plantset = plantset
         self.type_value = type_value
+        if period > 40:
+            self.plantset = self.plantset+'4d'
         cfg_filename = PLANTS[self.plantset]
         if self.plantset.endswith('4d'):
             self.plantset = self.plantset[:-2]
