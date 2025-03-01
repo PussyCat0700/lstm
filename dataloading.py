@@ -46,6 +46,13 @@ class PowerPlantDataset(Dataset):
         self.nwp_dir = path_loader.paths['source_nwp_dir']
         self.nwp_max_file = path_loader.paths['nwp_max_file']
         self.nwp_min_file = path_loader.paths['nwp_min_file']
+        self.nwp_input_len = path_loader.nwp_input_len
+        # TODO HARD CODED
+        self.outlen = 96
+        self.gap_days = 1
+        if self.nwp_input_len > 48:
+            self.gap_days = 4
+        # END OF TODO
         self.plant_number = plant_number
         if power_minmax is None:
             self.power_minmax = [
@@ -65,8 +72,13 @@ class PowerPlantDataset(Dataset):
     def denormalize_power_data(self, data):
         return data * (self.power_max - self.power_min) + self.power_min
 
-    def __len__(self):
-        return len(self.data) - 96*2  # Each sample requires data from two consecutive days. 96 points for each day
+    def _could_pad_len(self, idx, x, pad_value=0):
+        if len(x) < self.outlen:
+            pad_len = self.outlen - len(x)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
+            x = np.pad(x, (0, pad_len), mode='constant', constant_values=pad_value)
+            import pdb;pdb.set_trace()
+        return x
 
     def _get_start_time(self, idx):
         start_time = self.data.index[idx].replace(minute=0, second=0, microsecond=0)
@@ -92,7 +104,7 @@ class PowerPlantDataset(Dataset):
             nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
             nwp_data = np.load(nwp_file)
             hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
-            nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+48]
+            nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+self.nwp_input_len]
         return nwp_data_trunc
     
     def _get_global_min_max_weather(self):
@@ -166,9 +178,10 @@ class PowerPlantDataset(Dataset):
         
         # Next day data
         # total span: 96
-        next_start_time = start_time + pd.DateOffset(days=1) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
+        next_start_time = start_time + pd.DateOffset(days=self.gap_days) + pd.DateOffset(hours=15, minutes=45)  # day2 start 00:00:00
         next_end_time = next_start_time + pd.DateOffset(hours=23, minutes=45)  # day2 end 23:45:00
         Y = self.data.loc[next_start_time:next_end_time].iloc[:, 0].values
+        Y = self._could_pad_len(idx, Y)
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
@@ -182,10 +195,11 @@ class PowerPlantDataset(Dataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
-        time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
+        time_nwp_pe = get_time_pe(end_time, self.nwp_input_len, "1H")  # into the future
+        time_x_pe = get_time_pe(start_time, self.nwp_input_len, "30T")  # of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
-        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
+        time_y = self._could_pad_len(idx, time_y, None).tolist()
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
@@ -248,7 +262,7 @@ class PowerPlantDatasetWithNeighbors(PowerPlantDataset):
 
 class PowerPlantDailyDataset(PowerPlantDataset):
     def __len__(self):
-        return len(self.data) // 96 -  2  # Daily
+        return len(self.data) // 96 -  self.gap_days - 1  # Daily
 
     def _get_start_time(self, idx):
         offset = 1 + 4*8  # 08:15:00
@@ -258,7 +272,7 @@ class PowerPlantDailyDataset(PowerPlantDataset):
 
 class PowerPlantHourlyDataset(PowerPlantDataset):
     def __len__(self):
-        return len(self.data) // 4 - (24+16+24)  # Hourly
+        return len(self.data) // 4 - (24*self.gap_days+16+24)  # Hourly
     
     def _get_start_time(self, idx):
         offset = 1  # hh:15:00
@@ -272,6 +286,15 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         self.pred_span = pred_span
         self.outlen = pred_span*4
     
+    
+    def _could_pad_len(self, idx, x, pad_value=0):
+        if len(x) < self.outlen:
+            pad_len = self.outlen - len(x)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
+            x = np.pad(x, (0, pad_len), mode='constant', constant_values=pad_value)
+        return x
+
+
     def _could_pad_len(self, idx, x, pad_value=0):
         if len(x) < self.outlen:
             pad_len = self.outlen - len(x)
@@ -317,8 +340,8 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
                 nwp_data_scaled[..., i] = 1  # 归一化为常数1
             else:
                 nwp_data_scaled[..., i] = (nwp_data[..., i] - self.station_nwp_min[i]) / range_values[i]
-        time_nwp_pe = get_time_pe(end_time, 48, "1H")  # in 2 days into the future
-        time_x_pe = get_time_pe(start_time, 48, "30T")  # in 1 day of the past
+        time_nwp_pe = get_time_pe(end_time, self.nwp_input_len, "1H")  # in 2 days into the future
+        time_x_pe = get_time_pe(start_time, self.nwp_input_len, "30T")  # in 1 day of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
         time_y = self._could_pad_len(idx, time_y, None).tolist()
@@ -365,10 +388,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         self.offset = 8+6 if self.split == 'train' else 0
     
     def __len__(self):
-        if self.pred_span > 24:
-            length = len(self.data) // 4 - (self.offset+16+24)  # Hourly
-        else:
-            length = len(self.data) // 4 - (self.offset+self.pred_span)  # Hourly
+        length = len(self.data) // 4 - (self.offset+self.pred_span)  # Hourly
         return length
     
     def _get_start_time(self, idx):
@@ -502,7 +522,7 @@ def load_csv_data(X_file, Y_file, X_file_real, Y_file_real, nwp_file, time_csv):
 def get_dataset_and_denormalizer_sklearn(plant_number, split, folder_path, period:int, force_data=False):
     dataset = PowerPlantSklearnHourlyDataset(split, plant_number, period)
     postfix = ""
-    if period <= 24:
+    if period != 40:
         postfix = f"_{period}h"
     data = convert_torch_dataset_to_csv(dataset, os.path.join(folder_path, split), postfix, force_data)
     return data, dataset.denormalize_power_data
@@ -514,7 +534,7 @@ def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
         power_minmax = train_dataset.power_minmax
         valid_dataset = PowerPlantHourlyDataset("valid", plant_number, power_minmax)
         test_dataset = PowerPlantDailyDataset("test", plant_number, power_minmax)
-        test_loaders = {40: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False)}
+        test_loaders = {period: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False)}
     else:
         # We only consider when period=24 for the moment
         train_dataset = PowerPlantShortTermHourlyDataset("train", plant_number, period)
@@ -562,15 +582,20 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 if __name__ == '__main__':
     plant_number = 298
     bs = 2
-    path_loader.init('12m', 'china', plant_number)
-    for period in [1, 4, 24, 40]:
+    path_loader.init('12m', 'china4d', plant_number)
+    for period in [16+24*4,]:
         print(f'{period=}')
         data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
         assert len(data[KEY_TIME_Y]) == len(data[KEY_NORM_Y].flatten())
-    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
+    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 16+24*4)
     for period, test_loader in test_loaders.items(): 
-        outlen = period*4
+        outlen = period*4 if period < 40 else 96
         print(f"testing {period=}")
         for i, batch in enumerate(test_loader):
+            assert len(batch[KEY_NORM_NWP][bs-1]) == path_loader.nwp_input_len, i
             assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
-        print(batch[KEY_TIME_X][-1], batch[KEY_TIME_Y][-1])
+        print(batch[KEY_TIME_X][0], batch[KEY_TIME_Y][0])
+    for i, batch in enumerate(val_loader):
+        assert len(batch[KEY_NORM_NWP][bs-1]) == path_loader.nwp_input_len, i
+        assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
+    print(batch[KEY_TIME_X][0], batch[KEY_TIME_Y][0])

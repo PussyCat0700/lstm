@@ -5,10 +5,13 @@ import pandas as pd
 
 PLANTS = {
     "china": './conf/solar/china.yaml',
+    "china4d": './conf/solar_longnwp/china.yaml',
     "nmg": './conf/solar/nmg.yaml',
+    'nmg4d': './conf/solar_longnwp/nmg.yaml',
     "china_add": './conf/solar/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
+    "nanwang4d": './conf/solar_longnwp/nanwang.yaml',
     'newly_built': './conf/solar/newly_built.yaml'
 }
 KEY_REAL_X = "real_x"
@@ -47,6 +50,8 @@ class LazyPathLoader:
         self.plantset = plantset
         self.type_value = type_value
         cfg_filename = PLANTS[self.plantset]
+        if self.plantset.endswith('4d'):
+            self.plantset = self.plantset[:-2]
         self._load_cfg(cfg_filename)
         self.ablation_name = None
         if months != '12m':
@@ -132,6 +137,10 @@ class LazyPathLoader:
     @property
     def nwp_input_size(self):
         return self.config['params']['nwp_input_size']
+    
+    @property
+    def nwp_input_len(self):
+        return self.config['params'].get('nwp_input_len', 48)
     
     @property
     def is_weather_real(self):
