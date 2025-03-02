@@ -49,7 +49,7 @@ class LazyPathLoader:
         self.plant_number = plant_number
         self.plantset = plantset
         self.type_value = type_value
-        if period > 40:
+        if self.period > 40:
             self.plantset = self.plantset+'4d'
         cfg_filename = PLANTS[self.plantset]
         if self.plantset.endswith('4d'):
