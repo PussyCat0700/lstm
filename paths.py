@@ -9,6 +9,7 @@ PLANTS = {
     "nmg": './conf/solar/nmg.yaml',
     'nmg4d': './conf/solar_longnwp/nmg.yaml',
     "china_add": './conf/solar/china_add.yaml',
+    'china_add4d': './conf/solar_longnwp/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
     "nanwang4d": './conf/solar_longnwp/nanwang.yaml',
