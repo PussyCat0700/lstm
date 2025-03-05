@@ -8,4 +8,5 @@ paths:
   results_save_path: "/data1/yfliu/solar_baseline/china_add"
 params:
   nwp_input_size: 27
+  nwp_input_len: 120
   real_weather: false
