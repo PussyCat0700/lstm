@@ -66,25 +66,31 @@ class BiLSTMWithFusion(nn.Module):
 class CNNLSTMModel(nn.Module):
     def __init__(self,
                  input_dim:int,
+                 nwp_input_len:int,
                  with_px:bool=False,
                  num_layers=2,
                  dropout=0.5):
         super().__init__()
         self.with_px = with_px
+        self.ks = 2
+        self.fc1inlen = hidden_size * 24
         if with_px:
-            self.px_proj = nn.Linear(96, 48)
+            self.px_proj = nn.Linear(96, nwp_input_len)
             input_dim+=1
+        if nwp_input_len > 48:
+            self.ks = 3
+            self.fc1inlen = hidden_size * 40
         self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool1d(kernel_size=2)  # 池化层
+        self.pool = nn.MaxPool1d(kernel_size=self.ks)  # 池化层
         self.dropout = nn.Dropout(dropout)  # Dropout层
         self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True)  # LSTM层
-        self.fc1 = nn.Linear(hidden_size * 24, 256)  # 修改线性层输入大小
+        self.fc1 = nn.Linear(self.fc1inlen, 256)  # 修改线性层输入大小
         self.fc2 = nn.Linear(256, 96)
 
     def forward(self, x, px=None):
         # x.shape: (batch_size, seq_length, input_size)
-        # px.shape: (batch_size, 96, 1)
+        # px.shape: (batch_size, seq_length, 1)
         if self.with_px:
             px = self.px_proj(px.squeeze(-1)).unsqueeze(-1)
             x = torch.cat((x, px), dim=-1)

@@ -16,6 +16,7 @@
 task_id=$SLURM_ARRAY_TASK_ID
 offset=10
 echo $1
+echo $2
 
 for i in $(seq 0 $((offset-1)))
 do
@@ -24,6 +25,6 @@ do
     logdir=/data1/yfliu/logs/solar/nanwang/xgboost/${1}_${task_id}_${plant_number}
     echo "exporting to" "$logdir/log.txt"
     mkdir -p $logdir
-    python sklearn_train.py 0 --plant_number $plant_number --months $1 --plant_set "nanwang" --plant_type 0 --period 24 > "$logdir/log.txt" 2>&1 &
+    python sklearn_train.py 0 --plant_number $plant_number --months $1 --plant_set "nanwang" --plant_type 0 --period $2 > "$logdir/log.txt" 2>&1 &
 done
 wait

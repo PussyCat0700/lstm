@@ -4,13 +4,13 @@ import torch.nn.functional as F
 
 
 class WindPowerFFNN(nn.Module):
-    def __init__(self, nwp_input_size:int, with_px:bool=False,):
-        input_dim = nwp_input_size*48
+    def __init__(self, nwp_input_size:int, nwp_input_len:int, with_px:bool=False,):
+        input_dim = nwp_input_size*nwp_input_len
         super(WindPowerFFNN, self).__init__()
         self.with_px = with_px
         if with_px:
-            self.px_proj = nn.Linear(96, 48)
-            input_dim += 48
+            self.px_proj = nn.Linear(96, nwp_input_len)
+            input_dim += nwp_input_len
         self.fc = nn.Linear(input_dim, 96)
         self.sigmoid = nn.Sigmoid()
 
@@ -30,13 +30,13 @@ class WindPowerFFNN(nn.Module):
 
 
 class EnhancedWindPowerNN(nn.Module):
-    def __init__(self, nwp_input_size:int, with_px:bool=False,):
+    def __init__(self, nwp_input_size:int, nwp_input_len:int, with_px:bool=False,):
         super(EnhancedWindPowerNN, self).__init__()
-        input_dim = nwp_input_size*48
+        input_dim = nwp_input_size*nwp_input_len
         self.with_px = with_px
         if with_px:
-            self.px_proj = nn.Linear(96, 48)
-            input_dim += 48
+            self.px_proj = nn.Linear(96, nwp_input_len)
+            input_dim += nwp_input_len
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 32)

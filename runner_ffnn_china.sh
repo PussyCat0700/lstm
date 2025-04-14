@@ -18,6 +18,7 @@ offset=16
 # 计算任务的显卡ID
 gpu_id=$((task_id % 1))
 echo $1
+echo $2
 
 for i in $(seq 0 $((offset-1)))
 do
@@ -26,6 +27,6 @@ do
     logdir=/data1/yfliu/logs/solar/china/ffnn/${1}_${task_id}_${plant_number}
     echo "exporting to logdir $logdir/log.txt"
     mkdir -p $logdir
-    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 --period 24 > "$logdir/log.txt" 2>&1 &
+    CUDA_VISIBLE_DEVICES=$gpu_id python train.py 1 --plant_set china --plant_number $plant_number --months $1 --batch_size 1024 --period $2 > "$logdir/log.txt" 2>&1 &
 done
 wait

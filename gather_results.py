@@ -18,16 +18,16 @@ args = parser.parse_args()
 
 path_loader.init(args.months, args.plantset, 0, period=args.period)
 if args.period > 24:
-    postfixes = ["_40h",]
+    postfixes = [f"_{args.period}h",]
 else:
     postfixes = ["_24h", "_4h", "_1h"]
 info_csv_file = path_loader.paths['source_power_stat']
 df = read_station_info(info_csv_file)
 # 按TYPE列进行分组
 grouped = df.groupby('TYPE')
-save_base_path = os.path.join('./outputs', args.plantset, args.model)
 
 for postfix in postfixes:
+    save_base_path = os.path.join(f'./outputs{postfix}', args.plantset, args.model)
     print(f"{postfix=}")
     if postfix:
         save_path = os.path.join(save_base_path, '_'.join(postfix.split('_')[1:]), args.months)
