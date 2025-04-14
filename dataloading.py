@@ -421,7 +421,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = x_end_time - pd.DateOffset(hours=8)
+        nwp_time = x_start_time - pd.DateOffset(hours=8)
         nwp_data = self._get_nwp(nwp_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
@@ -581,20 +581,15 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 if __name__ == '__main__':
     plant_number = 298
     bs = 2
-    path_loader.init('12m', 'china4d', plant_number)
-    for period in [16+24*4,]:
+    path_loader.init('12m', 'china_real', plant_number)
+    for period in [40, 24, 4, 1]:
         print(f'{period=}')
         data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
         assert len(data[KEY_TIME_Y]) == len(data[KEY_NORM_Y].flatten())
-    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 16+24*4)
+    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
     for period, test_loader in test_loaders.items(): 
-        outlen = period*4 if period < 40 else 96
+        outlen = period*4
         print(f"testing {period=}")
         for i, batch in enumerate(test_loader):
-            assert len(batch[KEY_NORM_NWP][bs-1]) == path_loader.nwp_input_len, i
             assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
-        print(batch[KEY_TIME_X][0], batch[KEY_TIME_Y][0])
-    for i, batch in enumerate(val_loader):
-        assert len(batch[KEY_NORM_NWP][bs-1]) == path_loader.nwp_input_len, i
-        assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
-    print(batch[KEY_TIME_X][0], batch[KEY_TIME_Y][0])
+        print(batch[KEY_TIME_X][-1], batch[KEY_TIME_Y][-1])

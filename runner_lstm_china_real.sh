@@ -23,7 +23,7 @@ for i in $(seq 0 $((offset-1)))
 do
     plant_number=$((task_id + i))
     echo "Running task for plant_number: $plant_number"
-    logdir=/data1/yfliu/logs/solar/china_real/lstm/${1}_${task_id}_${plant_number}
+    logdir=/data0/yfliu/logs/solar/china_real/lstm/${1}_${task_id}_${plant_number}
     echo "exporting to" "$logdir/log.txt"
     mkdir -p $logdir
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py 3 --plant_set china_real --plant_number $plant_number --months $1 --batch_size 1024 > "$logdir/log.txt" 2>&1 &
