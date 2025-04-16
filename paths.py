@@ -11,6 +11,7 @@ PLANTS = {
     "china_add": './conf/solar/china_add.yaml',
     'china_add4d': './conf/solar_longnwp/china_add.yaml',
     "china_real": './conf/solar/china_real.yaml',
+    "china_real_eclimit": './conf/solar/china_real_eclimit.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
     "nanwang4d": './conf/solar_longnwp/nanwang.yaml',
     'newly_built': './conf/solar/newly_built.yaml'
@@ -100,7 +101,7 @@ class LazyPathLoader:
         paths = {key: value.format(plant_number=self.plant_id) for key, value in paths.items()}
         processed_dir = paths["processed_dir"]
         # special case here: when only weather is different:
-        chn = lambda s: s.replace('_real', '')
+        chn = lambda s: s.replace('_real', '').replace('_eclimit', '')
         rel_dir = f"{self.plantset}/{self.plant_id}"
         if self.ablation_name is not None:
             rel_dir = f"ablation_{self.plantset}/{self.ablation_name}/{self.plant_id}"

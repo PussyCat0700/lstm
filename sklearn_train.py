@@ -5,7 +5,7 @@ from dataloading import get_dataset_and_denormalizer_sklearn
 from draw import plot_predictions_vs_ground_truth_vanilla
 from constants import sklearn_model_type_dict
 from utils import compute_all_metrics, get_sklearn_model, write_csv
-from paths import KEY_NORM_NWP, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_Y, PLANTS, path_loader
+from paths import KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_Y, KEY_TIME_Y, PLANTS, path_loader
 import os
 import traceback
 
@@ -32,18 +32,22 @@ def everything(args, period:int):
     else:
         model = get_sklearn_model(args.model_type)
         X_nwp_train = train_data[KEY_NORM_NWP]
+        X_norm_train = train_data[KEY_NORM_X]
+        X_train = np.concatenate((X_nwp_train, X_norm_train), axis=-1)
         Y_train = train_data[KEY_NORM_Y]
-        model.fit(X_nwp_train, Y_train)
+        model.fit(X_train, Y_train)
         with open(model_ckpt, "wb") as f:
             pickle.dump(model,f)
     test_data, _ = get_dataset_and_denormalizer_sklearn(args.plant_number, "test", save_path, period, args.force_data)
     X_nwp_test = test_data[KEY_NORM_NWP]
+    X_norm_test = test_data[KEY_NORM_X]
+    X_test = np.concatenate((X_nwp_test, X_norm_test), axis=-1)
     Y_test_real = test_data[KEY_REAL_Y]
     Y_time = test_data[KEY_TIME_Y]
 
 
     try:
-        preds_test = model.predict(X_nwp_test)
+        preds_test = model.predict(X_test)
         preds_test = denormalizer(preds_test)
         preds_test = preds_test.flatten()
         Y_test_real = Y_test_real.flatten()

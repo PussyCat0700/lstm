@@ -90,20 +90,23 @@ class PowerPlantDataset(Dataset):
                 fixed_time = pd.to_datetime(nwp_time + pd.Timedelta(hours=hour))
                 nwp_file = os.path.join(self.nwp_dir, f"{fixed_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
                 nwp_data.append(np.load(nwp_file))
-            nwp_data_trunc = np.concatenate(nwp_data, axis=0).reshape(48, -1)
-        else:
-            fixed_times = pd.to_datetime([
-                f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
-                f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
-                f"{nwp_time.strftime('%Y-%m-%d')} 12:00:00",
-                f"{nwp_time.strftime('%Y-%m-%d')} 18:00:00"
-            ])
-            valid_times = [t for t in fixed_times if t <= nwp_time]
-            closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
-            nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
-            nwp_data = np.load(nwp_file)
-            hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
-            nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+self.nwp_input_len]
+            nwp_data_trunc_1 = np.concatenate(nwp_data, axis=0).reshape(48, -1)
+        fixed_times = pd.to_datetime([
+            f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 12:00:00",
+            f"{nwp_time.strftime('%Y-%m-%d')} 18:00:00"
+        ])
+        valid_times = [t for t in fixed_times if t <= nwp_time]
+        closest_time = min(valid_times, key=lambda t: abs(t - nwp_time))
+        nwp_file = os.path.join(self.nwp_dir, f"{closest_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
+        if path_loader.is_weather_real:
+            nwp_file = nwp_file.replace('real_', '')
+        nwp_data = np.load(nwp_file)
+        hours_diff = abs((closest_time - nwp_time).total_seconds()) // 3600
+        nwp_data_trunc = nwp_data[int(hours_diff):int(hours_diff)+self.nwp_input_len]
+        if path_loader.is_weather_real:
+            nwp_data_trunc = np.concatenate((nwp_data_trunc_1, nwp_data_trunc), axis=-1)
         return nwp_data_trunc
     
     def _get_global_min_max_weather(self):
@@ -117,6 +120,13 @@ class PowerPlantDataset(Dataset):
                 # 加载当前.npy文件
                 file_path = os.path.join(weather_data_dir, x)
                 data = np.load(file_path)
+                if path_loader.is_weather_real:
+                    file_path_nwp = file_path.replace('real_', '')
+                    if not os.path.exists(file_path_nwp):
+                        continue
+                    data_nwp = np.load(file_path_nwp)
+                    data_expanded = np.repeat(data[np.newaxis, :], data_nwp.shape[0], axis=0)
+                    data = np.concatenate((data_expanded, data_nwp), axis=-1)
                 if global_max is None:
                     global_max = np.full((data.shape[-1]), -np.inf)
                 if global_min is None:
