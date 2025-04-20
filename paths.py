@@ -12,8 +12,10 @@ PLANTS = {
     'nmg_real': './conf/solar/nmg_real.yaml',
     "china_add": './conf/solar/china_add.yaml',
     'china_add4d': './conf/solar_longnwp/china_add.yaml',
+    'china_add_real': './conf/solar/china_add_real.yaml',
     'nanwang': './conf/solar/nanwang.yaml',
     "nanwang4d": './conf/solar_longnwp/nanwang.yaml',
+    'nanwang_real': './conf/solar/nanwang_real.yaml',
     'newly_built': './conf/solar/newly_built.yaml'
 }
 KEY_REAL_X = "real_x"

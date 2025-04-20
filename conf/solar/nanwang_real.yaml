@@ -1,11 +1,11 @@
 plant_number: 96
 paths:
-  source_power_file: "/data1/yfliu/solar_baseline/solar/nanwang/data/{plant_number}.csv"
-  source_power_stat: "/data1/yfliu/solar_baseline/solar/nanwang/nanwang_info.csv"
-  source_coords_file: "/data1/yfliu/solar_baseline/solar/nanwang/nanwang_windfarm_coord.npy"
-  source_nwp_dir: "/data1/yfliu/solar_baseline/nwp_for_solar/weather_nanwang_interp/{plant_number}"
-  processed_dir: "/data1/yfliu/solar_baseline/solar/preprocessed"
-  results_save_path: "/data1/yfliu/solar_baseline/nanwang"
+  source_power_file: "/data0/yfliu/solar/solar/nanwang/data/{plant_number}.csv"
+  source_power_stat: "/data0/yfliu/solar/solar/nanwang/nanwang_info.csv"
+  source_coords_file: "/data0/yfliu/solar/solar/nanwang/nanwang_windfarm_coord.npy"
+  source_nwp_dir: "/data0/yfliu/solar/nwp_for_solar/real_weather_era5_v1"
+  processed_dir: "/data0/yfliu/solar/solar/preprocessed"
+  results_save_path: "/data0/yfliu/solar/nanwang_real"
 params:
-  nwp_input_size: 27
-  real_weather: false
+  nwp_input_size: 14
+  real_weather: true

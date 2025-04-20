@@ -6,7 +6,7 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X, KEY_TIME_X_PE, KEY_TIME_Y, KEY_TS_COORDS, path_loader
+from paths import KEY_CTX_COORDS, KEY_NORM_NWP, KEY_NORM_X, KEY_NORM_Y, KEY_REAL_X, KEY_REAL_Y, KEY_TIME_NWP_PE, KEY_TIME_X, KEY_TIME_X_PE, KEY_TIME_Y, KEY_TS_COORDS, path_loader, read_station_info
 
 
 H, W = 8, 8
@@ -43,6 +43,11 @@ class PowerPlantDataset(Dataset):
             csv_file = path_loader.paths['test_power_file']
         self.split = split
         self.data = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+        first_whole_hour = self.data.index[self.data.index.minute == 0][0]
+        if self.data.index[0] < first_whole_hour:
+            num_dropped = len(self.data[self.data.index < first_whole_hour])
+            print(f"Dropping {num_dropped} non-whole-hour records, keeping from {first_whole_hour}")
+        self.data = self.data[self.data.index >= first_whole_hour]
         self.nwp_dir = path_loader.paths['source_nwp_dir']
         self.nwp_max_file = path_loader.paths['nwp_max_file']
         self.nwp_min_file = path_loader.paths['nwp_min_file']
@@ -63,6 +68,14 @@ class PowerPlantDataset(Dataset):
         self.power_min = self.power_minmax[0]
         self.power_max = self.power_minmax[1]
         # Fit the weather scaler based on all weather data from all farms
+        self.is_nwp_csv = path_loader.is_weather_real
+        if self.is_nwp_csv:
+            info_csv_file = '/data0/yfliu/solar/solar/china_all/all_info_new.csv'
+            df_meta = read_station_info(info_csv_file)
+            self.meta_csv_id = df_meta[df_meta['PLANT_NO'] == path_loader.plant_id].iloc[0]['Unnamed: 0']
+            self.df_nwp_path = os.path.join(self.nwp_dir, str(self.meta_csv_id)+'.csv')
+            self.df_nwp_filled_path = os.path.join(self.nwp_dir, str(self.meta_csv_id)+'_filled.csv')
+            self.is_filled = os.path.exists(self.df_nwp_filled_path)
         self.init_weather_minmax()
         print('done doing weather.')
 
@@ -85,13 +98,11 @@ class PowerPlantDataset(Dataset):
     
     def _get_nwp(self, nwp_time):
         if path_loader.is_weather_real:
-            nwp_data = []
-            for hour in range(0, 48):
-                fixed_time = pd.to_datetime(nwp_time + pd.Timedelta(hours=hour))
-                nwp_file = os.path.join(self.nwp_dir, f"{fixed_time.strftime('%Y-%m-%d_%H:%M:%S')}_{path_loader.plantnumdict[self.plant_number]}.npy")
-                nwp_data.append(np.load(nwp_file))
-            nwp_data_trunc = np.concatenate(nwp_data, axis=0).reshape(48, -1)
+            start_idx = self.df_nwp.index.get_loc(nwp_time)
+            end_idx = start_idx + 48
+            nwp_data_trunc = np.array(self.df_nwp.iloc[start_idx:end_idx].values)
         else:
+            nwp_time = nwp_time - pd.DateOffset(hours=8)
             fixed_times = pd.to_datetime([
                 f"{nwp_time.strftime('%Y-%m-%d')} 00:00:00",
                 f"{nwp_time.strftime('%Y-%m-%d')} 06:00:00",
@@ -108,37 +119,55 @@ class PowerPlantDataset(Dataset):
     
     def _get_global_min_max_weather(self):
         weather_data_dir = self.nwp_dir
+        if self.is_nwp_csv:
+            self.df_nwp = pd.read_csv(self.df_nwp_filled_path if self.is_filled else self.df_nwp_path, parse_dates=[0], index_col=0)
         if (not os.path.exists(self.nwp_max_file)) or (not os.path.join(self.nwp_min_file)): 
             print('doing nwp minmax')
-            nan_count = 0
-            valid_count = 0
-            global_min = global_max = global_sum = None
-            for x in os.listdir(weather_data_dir):
-                # 加载当前.npy文件
-                file_path = os.path.join(weather_data_dir, x)
-                data = np.load(file_path)
-                if global_max is None:
-                    global_max = np.full((data.shape[-1]), -np.inf)
-                if global_min is None:
-                    global_min = np.full((data.shape[-1]), np.inf)
-                if global_sum is None:
-                    global_sum = np.full((data.shape[-1]), .0)
-                # 计算每个变量的最小值和最大值
-                local_max = np.max(data, axis=tuple(range(data.ndim - 1)))
-                local_min = np.min(data, axis=tuple(range(data.ndim - 1)))
-                local_avg = np.average(data, axis=tuple(range(data.ndim - 1)))
-                if np.isnan(local_max).any() or np.isnan(local_min).any():
-                    nan_count += 1
-                    fill_value = global_sum / (valid_count+valid_count)
-                    data[np.isnan(data)] = fill_value[np.isnan(data)]
-                    np.save(file_path, data)
-                    continue
-                else:
-                    global_sum += local_avg
-                    valid_count += 1
-                # 更新全局最大值和最小值
-                global_max = np.maximum(global_max, local_max)
-                global_min = np.minimum(global_min, local_min)
+            if self.is_nwp_csv:
+                if not self.is_filled:
+                    # 1. 填充 NaN 数据（使用平均值）
+                    df_filled = self.df_nwp.fillna(self.df_nwp.mean())
+
+                    # 2. 计算有效列的 min 和 max
+                    columns_to_consider = df_filled.columns  # 不包括日期列
+
+                    # 计算 min 和 max
+                    global_min = df_filled[columns_to_consider].min(axis=0).to_numpy()
+                    global_max = df_filled[columns_to_consider].max(axis=0).to_numpy()
+
+                    # 3. 保存填充后的 DataFrame 到 CSV
+                    df_filled.to_csv(self.df_nwp_filled_path)
+                    self.df_nwp = df_filled
+            else:
+                nan_count = 0
+                valid_count = 0
+                global_min = global_max = global_sum = None
+                for x in os.listdir(weather_data_dir):
+                    # 加载当前.npy文件
+                    file_path = os.path.join(weather_data_dir, x)
+                    data = np.load(file_path)
+                    if global_max is None:
+                        global_max = np.full((data.shape[-1]), -np.inf)
+                    if global_min is None:
+                        global_min = np.full((data.shape[-1]), np.inf)
+                    if global_sum is None:
+                        global_sum = np.full((data.shape[-1]), .0)
+                    # 计算每个变量的最小值和最大值
+                    local_max = np.max(data, axis=tuple(range(data.ndim - 1)))
+                    local_min = np.min(data, axis=tuple(range(data.ndim - 1)))
+                    local_avg = np.average(data, axis=tuple(range(data.ndim - 1)))
+                    if np.isnan(local_max).any() or np.isnan(local_min).any():
+                        nan_count += 1
+                        fill_value = global_sum / (valid_count+valid_count)
+                        data[np.isnan(data)] = fill_value[np.isnan(data)]
+                        np.save(file_path, data)
+                        continue
+                    else:
+                        global_sum += local_avg
+                        valid_count += 1
+                    # 更新全局最大值和最小值
+                    global_max = np.maximum(global_max, local_max)
+                    global_min = np.minimum(global_min, local_min)
 
             # 保存最终结果
             np.save(self.nwp_max_file, global_max)
@@ -184,8 +213,7 @@ class PowerPlantDataset(Dataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = end_time - pd.DateOffset(hours=8)
-        nwp_data = self._get_nwp(nwp_time)
+        nwp_data = self._get_nwp(end_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
         epsilon = 1e-10
@@ -329,8 +357,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = end_time - pd.DateOffset(hours=8)
-        nwp_data = self._get_nwp(nwp_time)
+        nwp_data = self._get_nwp(end_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
         epsilon = 1e-10
@@ -421,8 +448,7 @@ class PowerPlantSklearnHourlyDataset(PowerPlantHourlyDataset):
         Y_norm = self.normalize_power_data(Y)
 
         # Load the corresponding NWP data
-        nwp_time = x_start_time - pd.DateOffset(hours=8)
-        nwp_data = self._get_nwp(nwp_time)
+        nwp_data = self._get_nwp(x_start_time)
         range_values = self.station_nwp_max - self.station_nwp_min
         nwp_data_scaled = np.zeros_like(nwp_data)
         epsilon = 1e-10

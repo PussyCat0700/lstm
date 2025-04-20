@@ -271,7 +271,7 @@ if __name__ == "__main__":
     parser.add_argument("--plant_number", type=int, required=True, help="Power plant number to be used for training")
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for the optimizer")
-    parser.add_argument("--num_epochs", type=int, default=1000, help="Number of training epochs")
+    parser.add_argument("--num_epochs", type=int, default=30, help="Number of training epochs")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--months", help="months used in training set.")
     parser.add_argument("--plant_set", choices=PLANTS.keys())
