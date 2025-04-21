@@ -127,17 +127,16 @@ class PowerPlantDataset(Dataset):
                 if not self.is_filled:
                     # 1. 填充 NaN 数据（使用平均值）
                     df_filled = self.df_nwp.fillna(self.df_nwp.mean())
-
-                    # 2. 计算有效列的 min 和 max
-                    columns_to_consider = df_filled.columns  # 不包括日期列
-
-                    # 计算 min 和 max
-                    global_min = df_filled[columns_to_consider].min(axis=0).to_numpy()
-                    global_max = df_filled[columns_to_consider].max(axis=0).to_numpy()
-
                     # 3. 保存填充后的 DataFrame 到 CSV
                     df_filled.to_csv(self.df_nwp_filled_path)
                     self.df_nwp = df_filled
+                
+                # 2. 计算有效列的 min 和 max
+                columns_to_consider = self.df_nwp.columns  # 不包括日期列
+
+                # 计算 min 和 max
+                global_min = self.df_nwp[columns_to_consider].min(axis=0).to_numpy()
+                global_max = self.df_nwp[columns_to_consider].max(axis=0).to_numpy()
             else:
                 nan_count = 0
                 valid_count = 0

@@ -16,7 +16,8 @@ PLANTS = {
     'nanwang': './conf/solar/nanwang.yaml',
     "nanwang4d": './conf/solar_longnwp/nanwang.yaml',
     'nanwang_real': './conf/solar/nanwang_real.yaml',
-    'newly_built': './conf/solar/newly_built.yaml'
+    'newly_built': './conf/solar/newly_built.yaml',
+    'china_all_real': './conf/solar/china_all_real.yaml',
 }
 KEY_REAL_X = "real_x"
 KEY_REAL_Y = "real_y"
