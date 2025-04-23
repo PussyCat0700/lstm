@@ -99,7 +99,7 @@ class PowerPlantDataset(Dataset):
     def _get_nwp(self, nwp_time):
         if path_loader.is_weather_real:
             start_idx = self.df_nwp.index.get_loc(nwp_time)
-            end_idx = start_idx + 48
+            end_idx = start_idx + self.nwp_input_len
             nwp_data_trunc = np.array(self.df_nwp.iloc[start_idx:end_idx].values)
         else:
             nwp_time = nwp_time - pd.DateOffset(hours=8)
@@ -604,17 +604,17 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
-    plant_number = 298
+    plant_number = 0
     bs = 2
-    path_loader.init('12m', 'china_real', plant_number)
-    for period in [40, 24, 4, 1]:
-        print(f'{period=}')
-        data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
-        assert len(data[KEY_TIME_Y]) == len(data[KEY_NORM_Y].flatten())
-    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, 24)
+    period = 112
+    print(f'{period=}')
+    path_loader.init('12m', 'china_all_real', plant_number, period=period)
+    data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)
+    assert len(data[KEY_TIME_Y]) == len(data[KEY_NORM_Y].flatten())
+    train_loader, val_loader, test_loaders, denormalizer = get_data_loaders_and_denormalizer(plant_number, bs, period)
     for period, test_loader in test_loaders.items(): 
-        outlen = period*4
+        outlen = period*4 if period < 24 else 96
         print(f"testing {period=}")
         for i, batch in enumerate(test_loader):
-            assert len(batch[KEY_NORM_X][bs-1]) == 96 and len(batch[KEY_NORM_Y][bs-1]) == outlen, i
+            assert len(batch[KEY_NORM_X][0]) == 96 and len(batch[KEY_NORM_Y][0]) == outlen, i
         print(batch[KEY_TIME_X][-1], batch[KEY_TIME_Y][-1])
