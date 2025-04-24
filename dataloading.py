@@ -564,7 +564,7 @@ def get_data_loaders_and_denormalizer(plant_number, batch_size, period:int):
         train_dataset = PowerPlantShortTermHourlyDataset("train", plant_number, period)
         power_minmax = train_dataset.power_minmax
         valid_dataset = PowerPlantShortTermHourlyDataset("valid", plant_number, period, power_minmax)
-        for period in [1, 4, 24]:
+        for period in [4]:
             test_dataset = PowerPlantShortTermPeriodlyDataset("test", plant_number, period, power_minmax)
             test_loaders.update({
                 period: DataLoader(test_dataset, batch_size=batch_size, num_workers=1, shuffle=False),
@@ -606,7 +606,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 if __name__ == '__main__':
     plant_number = 0
     bs = 2
-    period = 112
+    period = 4
     print(f'{period=}')
     path_loader.init('12m', 'china_all_real', plant_number, period=period)
     data, _ = get_dataset_and_denormalizer_sklearn(plant_number, "valid", "here", period)

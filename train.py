@@ -117,7 +117,7 @@ def train_model(device, model, train_loader, val_loader, test_loaders, denormali
             print(f'*****{epoch=}******')
             for batch_idx, batch in enumerate(pbar):
                 optimizer.zero_grad()
-                loss = forward_model(batch, True)[0]
+                loss = forward_model(batch, True, period_hours=path_loader.period*4)[0]
                 if torch.isnan(loss):
                     print("NaN detected in training loss. Stopping training.")
                     with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -141,7 +141,7 @@ def train_model(device, model, train_loader, val_loader, test_loaders, denormali
             val_loss = 0.0
             with torch.no_grad():
                 for batch_idx, batch in enumerate(val_loader):
-                    loss = forward_model(batch, False)[0]
+                    loss = forward_model(batch, False, period_hours=path_loader.period*4)[0]
                     if torch.isnan(loss):
                         print("NaN detected in validation loss. Stopping training.")
                         with open(os.path.join(checkpoint_dir, "NAN_FOUND"), "w") as f:
@@ -287,6 +287,7 @@ if __name__ == "__main__":
     args.nwp_input_size = path_loader.nwp_input_size
     args.nwp_input_len = path_loader.nwp_input_len
     args.checkpoint_dir, is_done = path_loader.get_run_path_status(args.model_type)
+    print(f"ckpt: {args.checkpoint_dir}", flush=True)
     logger_file = os.path.join(args.checkpoint_dir, 'log.txt')
     with open(logger_file, 'w') as sys.stdout:
         print(f'now training {args.model_type}')
