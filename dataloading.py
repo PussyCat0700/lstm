@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import math
 import torch
 from torch.utils.data import Dataset
@@ -90,6 +91,20 @@ class PowerPlantDataset(Dataset):
             pad_len = self.outlen - len(x)
             print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
             x = np.pad(x, (0, pad_len), mode='constant', constant_values=pad_value)
+        return x
+
+    def _could_pad_len_time(self, idx, x):
+        # 把x转成list，保证可以append
+        x = list(x)
+        if len(x) < self.outlen:
+            pad_len = self.outlen - len(x)
+            print(f'padding {idx}th sample in {self.split}. length is {pad_len} matching length {self.outlen}')
+            
+            # 从最后一个元素推算下一个时间
+            last_time = datetime.strptime(x[-1], '%Y-%m-%d %H:%M:%S')
+            for _ in range(pad_len):
+                last_time += timedelta(minutes=15)
+                x.append(last_time.strftime('%Y-%m-%d %H:%M:%S'))
         return x
 
     def _get_start_time(self, idx):
@@ -225,7 +240,7 @@ class PowerPlantDataset(Dataset):
         time_x_pe = get_time_pe(start_time, self.nwp_input_len, "30T")  # of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
-        time_y = self._could_pad_len(idx, time_y, None).tolist()
+        time_y = self._could_pad_len_time(idx, time_y)
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
@@ -369,7 +384,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
         time_x_pe = get_time_pe(start_time, self.nwp_input_len, "30T")  # in 1 day of the past
         time_x = self.data.loc[start_time:end_time].index.strftime('%Y-%m-%d %H:%M:%S').tolist()
         time_y = self.data.loc[next_start_time:next_end_time].index.strftime('%Y-%m-%d %H:%M:%S')
-        time_y = self._could_pad_len(idx, time_y, None).tolist()
+        time_y = self._could_pad_len_time(idx, time_y)
         return {
             KEY_REAL_X: torch.tensor(X, dtype=torch.float32),
             KEY_REAL_Y: torch.tensor(Y, dtype=torch.float32),
@@ -385,7 +400,7 @@ class PowerPlantShortTermDataset(PowerPlantDataset):
 
 class PowerPlantShortTermPeriodlyDataset(PowerPlantShortTermDataset):
     def __len__(self):
-        return math.floor((len(self.data) // 4 - 24) / self.pred_span)
+        return math.floor((len(self.data) // 4 - 24*3) / self.pred_span)
     
     def _get_start_time(self, idx):
         offset = 1  # hh:15:00
@@ -604,7 +619,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
 
 
 if __name__ == '__main__':
-    plant_number = 0
+    plant_number = 8
     bs = 2
     period = 4
     print(f'{period=}')
