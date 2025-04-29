@@ -5,7 +5,7 @@
 #SBATCH --time=00:15:00
 #SBATCH --partition=RTX3090,RTX4090,L40S,ADA6000
 #SBATCH --cpus-per-task=12  # 每个进程的CPU数量
-#SBATCH --array=0-610:10%1       # 任务ID范围
+#SBATCH --array=0-610:10%2       # 任务ID范围
 #SBATCH --mem=40GB
 #SBATCH --qos=ne_ablation
 #SBATCH --output=./logs/station_logs/china_all_real/xgboost_%A_%a.out

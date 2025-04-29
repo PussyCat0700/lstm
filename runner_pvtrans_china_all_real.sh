@@ -3,8 +3,8 @@
 #SBATCH --account=yfliu3
 #SBATCH --job-name=pvtrans_e_china_all_real
 #SBATCH --partition=RTX3090,RTX4090,A100,ADA6000
-#SBATCH --cpus-per-task=12  # 每个进程的CPU数量
-#SBATCH --array=0-1172:16%1       # 任务ID范围
+#SBATCH --cpus-per-task=16  # 每个进程的CPU数量
+#SBATCH --array=0-1172:16%2       # 任务ID范围
 #SBATCH --mem=80GB
 #SBATCH --qos=ne_ablation
 #SBATCH --gres=gpu:1        # 若使用2块卡，则gres=gpu:2
